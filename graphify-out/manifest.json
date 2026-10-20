@@ -348,9 +348,9 @@
     "semantic_hash": "86f49fbfb9eb406bbdc5801c2da77e65"
   },
   "README.md": {
-    "mtime": 1792258973.2965558,
-    "seen": 1792259507.141453,
-    "ast_hash": "1b79cb0347f9baf6acef854021f43110",
+    "mtime": 1792342861.5220673,
+    "seen": 1792523223.116247,
+    "ast_hash": "02d85f41833939a38ca336556c0d403d",
     "semantic_hash": ""
   },
   "docker-compose.yml": {
@@ -743,12 +743,6 @@
     "ast_hash": "4eac5acd9318037ee4a57ddbf934478d",
     "semantic_hash": ""
   },
-  "docs/falkordb-safety-layer-light.html": {
-    "mtime": 1792248211.5664802,
-    "seen": 1792252418.035017,
-    "ast_hash": "391b71582f7a012c88a254ea45e3b384",
-    "semantic_hash": ""
-  },
   "docs/falkordb-safety-layer.html": {
     "mtime": 1792248211.5675333,
     "seen": 1792252418.035018,
@@ -942,14 +936,14 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1792268391.1776333,
-    "seen": 1792268396.856929,
+    "mtime": 1792308345.916634,
+    "seen": 1792523223.116242,
     "ast_hash": "544b6726cf846b2ed4fe6fefd2d0a6f8",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1792268391.1778831,
-    "seen": 1792268396.85693,
+    "mtime": 1792308345.9168146,
+    "seen": 1792523223.116244,
     "ast_hash": "544b6726cf846b2ed4fe6fefd2d0a6f8",
     "semantic_hash": ""
   },
