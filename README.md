@@ -155,7 +155,7 @@ $$\text{Trust} = 0.5 \cdot \text{EvidenceRatio} + 0.3 \cdot \text{Freshness} + 0
 
 ## Claude Code & Agent Integration
 
-> **Experimental**: Both the Claude Code Stop hook and the Antigravity integration are
+> Both the Claude Code Stop hook and the Antigravity integration are
 > labeled **experimental**. The Antigravity `hooks.json` schema was verified against
 > [Antigravity's official hook documentation](https://antigravity.google/docs/hooks), but
 > both integrations have only been validated with simulated stdin/stdout input. A real
