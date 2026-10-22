@@ -1,242 +1,502 @@
-# Guard: Graph-Powered Safety Layer for AI Coding Agents
+# Guard
 
-[![PyPI version](https://img.shields.io/pypi/v/guard-cli.svg)](https://pypi.org/project/guard-cli/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![FalkorDB](https://img.shields.io/badge/Graph-FalkorDB-red.svg)](https://falkordb.com/)
+**Graph-powered safety layer for AI coding agents built on [FalkorDB](https://falkordb.com)**
 
-> **A high-velocity, graph-native regression prevention engine built on FalkorDB.**  
-> Guard selects the exact minimal subset of tests to run after an AI coding agent modifies code, measures a multi-factor **Trust Score**, and deterministically triggers hard fallbacks to full test suites when graph confidence drops.
+Guard builds a live knowledge graph of your codebase—functions, tests, call paths, and coverage evidence—and intercepts every agent stop-turn to run only the tests that can actually catch a regression in what just changed. When coverage evidence is missing or stale, Guard falls back to the full suite. It never silently passes.
+
+```
+Agent edits code → Guard Stop Hook fires → graph query → targeted test run → block or pass
+```
 
 ---
 
-## Quickstart
+## Table of Contents
 
-### 1. Install Guard
+- [How It Works](#how-it-works)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Setup](#setup)
+- [Configuration](#configuration)
+- [CLI Reference](#cli-reference)
+- [Agent Integration](#agent-integration)
+- [Graph Data Model](#graph-data-model)
+- [Trust & Decision Engine](#trust--decision-engine)
+- [Feedback Loop](#feedback-loop)
+- [Development](#development)
+
+---
+
+## How It Works
+
+1. **`guard init`** — Parses your repo statically (AST), runs the test suite once to collect per-test coverage, and writes the knowledge graph into FalkorDB.
+2. **Stop hook** — When an AI agent finishes a turn, Guard diffs the working tree, resolves which functions changed, queries the graph for covering tests, and either runs a targeted subset or the full suite.
+3. **Trust score** — Every decision carries a `trust` score (0–1) composed of evidence ratio, edge freshness, and dynamic-dispatch uncertainty. Low trust = full suite.
+4. **Feedback loop** — When a regression slips through, `guard feedback` inserts a high-confidence repair edge so the miss cannot repeat.
+
+---
+
+## Requirements
+
+| Requirement | Version |
+|---|---|
+| Python | ≥ 3.10 (≥ 3.12 for embedded backend) |
+| pytest + pytest-cov | any recent version |
+| FalkorDB | one of: Docker, existing server, or embedded (see below) |
+
+### FalkorDB backend options
+
+| Backend | When to use |
+|---|---|
+| **Docker** (default) | Local dev — Guard starts a container automatically |
+| **Server** | Existing FalkorDB/Redis instance on your network |
+| **Embedded** | Python 3.12+, macOS 15+ or Linux glibc ≥ 2.39; no Docker needed |
+
+---
+
+## Installation
+
 ```bash
-uv tool install guard-cli
-# Or with embedded FalkorDB support on Python 3.12+:
-# uv tool install "guard-cli[embedded]"
+pip install guard-cli
 ```
 
-### 2. Initialize in your Repository
+With the embedded (no-Docker) backend:
+
 ```bash
-cd /path/to/your/repo
+pip install "guard-cli[embedded]"   # requires Python 3.12+
+```
+
+For development:
+
+```bash
+git clone https://github.com/thisisvaishnav/guard
+cd guard
+pip install -e ".[dev]"
+```
+
+---
+
+## Setup
+
+### 1. Initialize Guard in your repo
+
+Run this once from your project root (or pass a path):
+
+```bash
 guard init
 ```
-`guard init` auto-detects your Python environment, sets up FalkorDB (server, docker, or embedded), ingests static call graphs & dynamic test coverage, and configures agent integrations (Claude Code Stop hook, AGENTS.md, .gitignore).
 
-### 3. Check System Health
+`guard init` will:
+
+1. Locate your git root and test configuration.
+2. Resolve or start a FalkorDB backend.
+3. Parse all Python source files (AST static analysis).
+4. Run the test suite and collect per-test coverage.
+5. Write the knowledge graph (functions → tests → files).
+6. Install the Stop hook into your agent's settings file.
+7. Add a `guard run` instruction to `AGENTS.md` / `CLAUDE.md`.
+
+**Non-interactive / CI:**
+
+```bash
+guard init --yes --backend docker --skip-coverage
+```
+
+**Choose backend explicitly:**
+
+```bash
+guard init --backend server    # existing FalkorDB on localhost:6379
+guard init --backend docker    # Docker (auto-start)
+guard init --backend embedded  # in-process FalkorDBLite (Python 3.12+)
+```
+
+**Choose which agents to configure:**
+
+```bash
+guard init --agents claude,antigravity,cursor,codex
+```
+
+### 2. Verify the installation
+
 ```bash
 guard doctor
 ```
-Verifies backend connectivity, graph integrity, git freshness, and integration settings.
 
----
+`guard doctor` checks:
+- Backend connectivity and graph freshness
+- Hook installation in agent settings
+- pytest-cov availability
+- Environment sanity
 
-## Verified Benchmark Results (Held-Out Evaluation)
+Auto-fix common issues:
 
-Evaluated against **`pallets/flask`** (494 tests) across 24 held-out mutants under a frozen protocol (`evals/split.json`, `PLAN.md`).
-
-All metrics are evaluated and reported as **Paired Metrics** (Escape Rate $\leftrightarrow$ Fallback Rate $\leftrightarrow$ Savings Ratio):
-
-| Strategy / Engine | Escape Rate (Paired) | Savings Ratio (Paired) | Fallback Rate (Paired) | Killable Evaluated | Escapes |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **`run-all`** (Ground Truth) | 0.0% (0/17) | 0.0% | 100.0% (24/24) | 17 | None |
-| **`same-file`** (Heuristic) | 17.6% (3/17) | 77.3% | 0.0% (0/24) | 17 | `m08`, `m16`, `m30` |
-| **`naive-guess`** (Agent Guess) | 17.6% (3/17) | 77.5% | 0.0% (0/24) | 17 | `m08`, `m16`, `m30` |
-| **`guard` (Full System)** | **0.0% (0/17)** | **67.3%** | **25.0% (6/24)** | 17 | **0 (Zero)** |
-| *Ablation 1: `guard-no-confidence`* | 0.0% (0/17) | 77.1% | 20.8% (5/24) | 17 | None |
-| *Ablation 2: `guard-no-widening`* | 0.0% (0/17) | 73.3% | 25.0% (6/24) | 17 | None |
-
-> **Key Result**: Guard achieved a **0.0% Escape Rate** while delivering **67.3% Test-Time Savings** compared to `run-all`, completely eliminating the 17.6% escape rate of naive heuristics.
-
-### Case Study: Root Cause of `m08` Escape Under `same-file`
-- **Mutant `m08`** inverted an `if not` condition in `src/flask/helpers.py:45`.
-- `same-file` and `naive-guess` selected only `tests/test_helpers.py` (30 tests) $\to$ **0 failures reported (Escape)**.
-- `guard` traversed FalkorDB `COVERED_BY` edges and detected dependent execution paths in `tests/test_basic.py`, `tests/test_blueprints.py`, and `tests/test_templating.py` (26 tests) $\to$ **Caught failure in 0.13s (0.0% escape)**.
-
----
-
-## Problem Statement & Motivation
-
-When AI coding agents (Claude Code, Cursor, Codex, OpenCode) modify complex codebases, running the entire test suite on every step slows iteration cycles to a crawl. Conversely, naive heuristics introduce catastrophic silent escapes:
-
-- **Same-File Heuristic (`same-file`)**: Only runs tests in the matching test file (e.g., changes in `src/flask/helpers.py` $\to$ run `tests/test_helpers.py`). Foundational helpers, middleware, and lifecycle hooks are heavily exercised across disparate modules (`test_basic.py`, `test_blueprints.py`, `test_templating.py`). On the held-out benchmark, **`same-file` suffered a 17.6% Escape Rate** (3 missed failures).
-- **Agent Guessing (`naive-guess`)**: LLMs predicting test paths based on file names or semantic similarity produce identical blind spots and hallucinate coverage.
-- **Run-All Suite (`run-all`)**: 100% safe, but destroys developer velocity and agent autonomy on non-trivial suites.
-
-**Guard's Core Thesis**: Code relationships and test executions form a graph topology. By indexing static AST relationships and per-test dynamic coverage contexts inside **FalkorDB**, Guard computes exact dependency subgraphs, measures empirical test confidence, dynamically widens around ambiguous dynamic dispatch, and enforces hard overrides when evidence is absent.
-
----
-
-## Architecture & System Design
-
-Guard operates as a deterministic, graph-native verification pipeline connecting static code structure, dynamic coverage telemetry, and autonomous agent loops:
-
-1. **AST Diff Analyzer (`guard.thin_slice`)**: Inspects unified git diffs, identifies modified lines, and resolves them to exact function boundaries while flagging test file modifications.
-2. **FalkorDB Graph Engine (`guard.db`)**: Maintains structural call/import relationships and empirical per-test coverage contexts (`COVERED_BY`) in FalkorDB for sub-millisecond Cypher graph traversals.
-3. **Decision Engine (`guard.decision`)**: Pre-emptively checks hard safety overrides (uncovered functions, dynamic dispatch, touched tests), computes the multi-factor Trust Score, and routes execution to the appropriate policy level.
-4. **Self-Healing Feedback Loop (`guard.feedback`)**: Injects high-confidence `miss_repair` edges whenever a missed failure is detected, continuously hardening the graph against future escapes.
-
-```
-       +-----------------------+
-       |   AI Agent Git Diff   |
-       +-----------+-----------+
-                   |
-                   v
-       +-----------------------+
-       |   AST Diff Analyzer   | -> Identifies modified functions & test files
-       +-----------+-----------+
-                   |
-                   v
-       +-----------------------+
-       |  FalkorDB Graph Engine| -> Queries COVERED_BY edges, call paths,
-       +-----------+-----------+    and dynamic dispatch topology
-                   |
-                   v
-       +-----------------------+
-       |    Decision Engine    | -> Evaluates hard overrides & Trust Score
-       +-----------+-----------+
-                   |
-         +---------+---------+
-         |                   |
-    Trust >= 0.8        Trust < 0.8 / Override
-         |                   |
-         v                   v
-+-----------------+ +-----------------+
-| Targeted Subset | | Full Test Suite |
-+-----------------+ +-----------------+
+```bash
+guard doctor --fix
 ```
 
-### FalkorDB Graph Schema
+JSON output for CI:
 
-#### Nodes
-- `(:File {path})`: Source files and test files in the repository.
-- `(:Function {id, file, name, qualname, start, end, has_dynamic_dispatch, no_evidence})`: Function and method definitions.
-- `(:Test {id, file, name, qualname, start, end, flake_rate})`: Pytest test units.
-- `(:Run {id, timestamp, commit_sha, duration_ms, total_tests, passed, failed})`: Historical test execution runs.
+```bash
+guard doctor --json
+```
 
-#### Edges
-- `(:Function)-[:DEFINED_IN]->(:File)`: Static structural hierarchy.
-- `(:Test)-[:DEFINED_IN]->(:File)`: Static test placement.
-- `(:Function)-[:CALLS {source: 'static', confidence: 0.6, last_verified_sha}]->(:Function)`: Multi-hop static call graph.
-- `(:File)-[:IMPORTS {source: 'static', confidence: 0.6}]->(:File)`: Module import topology.
-- `(:Function)-[:COVERED_BY {source: 'coverage'|'miss_repair', confidence, evidence_count, last_verified_sha}]->(:Test)`: Verified dynamic execution evidence connecting modified functions directly to covering tests.
-- `(:Test)-[:FAILED_IN {source: 'test_run', error_message}]->(:Run)`: Historical test failure records.
+### 3. (Optional) Re-ingest after large refactors
+
+```bash
+guard ingest-static .           # re-parse source → graph
+guard ingest-coverage .         # re-run coverage → COVERED_BY edges
+```
 
 ---
 
-## Decision Engine & Trust Model
+## Configuration
 
-Guard evaluates code changes using a strict two-stage process: **Hard Safety Overrides** followed by the **Empirical Trust Score Policy**.
+Guard stores per-repo config in `.guard/config.toml`:
 
-### 1. Hard Safety Overrides (Pre-Emptive Gating)
-Before computing continuous scores, Guard enforces three non-bypassable guardrails:
-1. **Test Files Touched**: If any test file is modified or added, Guard forces `run-all` with a safety warning.
-2. **Missing Evidence (`no_evidence`)**: If any modified function lacks dynamic coverage evidence in FalkorDB, Guard automatically falls back to `run-all` (never guess when unmapped).
-3. **Dynamic Dispatch Flagged**: If AST analysis flags dynamic dispatch (`getattr`, `setattr`, `eval`, `**kwargs` dispatch), Guard automatically triggers **Dynamic Widening**, expanding the candidate test set to include all module tests.
+```toml
+[backend]
+type = "docker"           # server | docker | embedded
+host = "localhost"        # server backend only
+port = 6390               # docker default; server uses 6379
+graph_name = "my_repo"   # defaults to repo directory name
+```
 
-### 2. Trust Score Formula
-When no hard overrides force `run-all`, Guard computes the composite trust metric:
+Environment variable overrides:
 
-$$\text{Trust} = 0.5 \cdot \text{EvidenceRatio} + 0.3 \cdot \text{Freshness} + 0.2 \cdot (1 - \text{UncertainRatio})$$
-
-- $\text{EvidenceRatio}$: Mean of the highest covering-edge confidence per modified function ($0.0$ for functions without covering edges).
-- $\text{Freshness}$: Proportion of evidence edges whose `last_verified_sha` matches the current commit SHA.
-- $\text{UncertainRatio}$: Proportion of modified functions flagged with dynamic dispatch patterns.
-
-### 3. Three-Level Execution Policy
-- **$\text{Trust} \ge 0.8$ (`subset`)**: Execute only the directly covering tests mapped via high-confidence `COVERED_BY` edges.
-- **$0.5 \le \text{Trust} < 0.8$ (`medium`)**: Execute the covering subset plus all tests associated with the modified modules.
-- **$\text{Trust} < 0.5$ (`run-all`)**: Enforce full test suite fallback.
-
----
-
-## Claude Code & Agent Integration
-
-> Both the Claude Code Stop hook and the Antigravity integration are
-> labeled **experimental**. The Antigravity `hooks.json` schema was verified against
-> [Antigravity's official hook documentation](https://antigravity.google/docs/hooks), but
-> both integrations have only been validated with simulated stdin/stdout input. A real
-> live session (Claude Code, Antigravity) has not yet confirmed end-to-end behavior.
-
-Guard integrates into autonomous coding workflows:
-
-- **Claude Code Stop Hook**: Installed via `guard hook install` into `.claude/settings.local.json`. Whenever Claude attempts to conclude a task, the Stop hook evaluates the diff. If tests fail, it blocks completion (Exit 2) and injects a concise $\le$ 30 line failure report.
-- **Idle-Turn Optimization**: Caches working-tree SHA-256 fingerprints and skips unchanged turns and non-Python diffs.
-- **Loop Guard**: Caps consecutive failures at 3 attempts, handing control back to the user before burning tokens.
-- **Audit Log**: Appends all hook executions, test results, and decisions to `.guard/events.jsonl`.
+```bash
+FALKORDB_HOST=my-server FALKORDB_PORT=6379 guard run
+GUARD_GRAPH=my_graph guard run
+GUARD_DEBUG_PAYLOAD=1 guard hook stop   # dumps raw hook payload to .guard/last_payload.json
+```
 
 ---
 
 ## CLI Reference
 
-### `guard init`
-Initializes Guard in a repository, detects backends, and configures integrations:
-```bash
-guard init [--backend server|docker|embedded] [--skip-coverage]
+```
+guard init [repo] [--backend server|docker|embedded] [--skip-coverage] [-y] [--agents ...]
+guard doctor [repo] [--json] [--fix]
+guard run [--diff path] [--repo path] [--json] [--strict]
+guard check [--diff path] [--repo path] [--json] [--strict]
+guard ingest-static <repo> [--dry-run] [--include-tests] [--commit-sha SHA]
+guard ingest-coverage <repo> [--runs N] [--commit-sha SHA]
+guard callers <function-id> [--hops N] [--min-confidence F]
+guard covering-tests <function-id> [--min-confidence F]
+guard feedback --function <id> --test <id> [--confidence F]
+guard stats
+guard hook install [--repo path] [--shared] [--antigravity]
+guard hook uninstall [--repo path] [--shared] [--antigravity]
+guard hook status [--repo path] [--antigravity]
+guard hook stop [--repo path] [--strict]
+guard hook session-start [--repo path]
 ```
 
-#### Backends & Platform Support
+### Key flags
 
-Guard supports three FalkorDB backend topologies:
-1. **Server (`--backend server`)**: Connects to an existing FalkorDB instance (default: `localhost:6379`). Works across all platforms.
-2. **Docker (`--backend docker`)**: Automatically launches and manages a dedicated `guard-falkordb` container on port 6390. Works on any platform with Docker installed.
-3. **Embedded (`--backend embedded`)**: Zero-configuration, in-process FalkorDBLite instance.
-   - **Supported OS & Platform Requirements**:
-     - **Python**: 3.12 or newer
-     - **Linux**: `glibc` 2.39 or newer (e.g., Ubuntu 24.04+, Fedora 40+)
-     - **macOS**: macOS 15 (Sequoia) or newer
-   - **Platform Fallback**: On unsupported platforms (such as Linux with glibc < 2.39 or macOS < 15), Guard prints a clear message:
-     ```text
-     no embedded build for this platform, use Docker or a server
-     ```
-     and guides you to use `--backend docker` or `--backend server` instead of failing with a build error.
+| Flag | Effect |
+|---|---|
+| `--strict` | Fail closed if Guard itself errors (default: fail open) |
+| `--json` | Machine-readable output on stdout |
+| `--dry-run` | Parse without touching the database |
+| `--shared` | Write to `settings.json` instead of `settings.local.json` |
 
-### `guard doctor`
-Verifies system health, backend reachability, graph counts, and settings:
-```bash
-guard doctor [--fix]
+### Function ID format
+
+Guard uses qualified names as function IDs:
+
 ```
-
-### `guard run`
-Executes agent pre-completion test verification on the current working tree diff:
-```bash
-guard run [--repo /path/to/repo]
-```
-
-### `guard check`
-Computes the test selection decision without executing tests (outputs JSON schema v1.0 or text):
-```bash
-guard check [--repo /path/to/repo] [--json]
-```
-
-### `guard hook`
-Manages Claude Code and agent hook configurations (experimental — see note above):
-```bash
-guard hook install [--shared] [--antigravity]
-guard hook status
-guard hook uninstall [--antigravity]
-```
-
-### `guard feedback`
-Repairs the graph after an unexpected failure:
-```bash
-guard feedback --function "src/flask/helpers.py::url_for" --test "tests/test_helpers.py::test_url_for"
+guard_cli/api.py::run
+guard_cli/decision.py::decide
+guard_cli/db.py::write_static
+tests/test_decision.py::test_decide_no_evidence
 ```
 
 ---
 
-## Documentation & Visualizations
+## Agent Integration
 
-Additional architectural diagrams, interactive visualizations, and test reports are available in the [`docs/`](docs/) directory:
-- [Interactive 3D Flow Architecture](docs/project_flow_3d.html)
-- [Safety Layer Overview](docs/falkordb-safety-layer.html)
-- [Verification Reports](reports/)
+### Claude Code
+
+```bash
+guard hook install
+```
+
+Writes a Stop hook entry into `.claude/settings.local.json`. When Claude tries to stop a turn, the hook calls `guard hook stop`, which blocks if tests fail.
+
+```bash
+guard hook install --shared   # → .claude/settings.json (shared across users)
+```
+
+### Antigravity
+
+```bash
+guard hook install --antigravity
+```
+
+Writes a `PreStop` hook entry into `.agents/hooks.json`.
+
+### Manual hook invocation
+
+```bash
+guard hook stop --repo /path/to/repo
+```
+
+Exit codes: `0` = pass (or fail-open), `2` = tests failed (agent blocked).
+
+---
+
+## Graph Data Model
+
+Guard's knowledge graph is stored in [FalkorDB](https://falkordb.com) (a property graph database). Each repository gets its own named graph (default: the repository directory name).
+
+### Node types
+
+| Label | Key property | Description |
+|---|---|---|
+| `File` | `path` (string) | A Python source file, repo-relative path |
+| `Function` | `id` (string) | A callable — function or method, identified by `file::qualname` |
+| `Test` | `id` (string) | A pytest-discoverable test function |
+| `Run` | `id` (string) | A recorded test-suite execution |
+| `GuardMeta` | `id = "meta"` | Singleton: graph generation counter and last-updated timestamp |
+
+#### `Function` properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | string | `file.py::ClassName.method` — globally unique within the graph |
+| `name` | string | Simple function name |
+| `qualname` | string | Dotted qualified name within the module |
+| `file` | string | Relative path of the containing file |
+| `start` | int | First line number |
+| `end` | int | Last line number |
+| `has_dynamic_dispatch` | bool | `true` if the function uses `getattr`, `eval`, `exec`, `__import__`, etc. |
+
+#### `Test` properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | string | `tests/test_foo.py::TestClass.test_method` |
+| `name` | string | Simple test name |
+| `qualname` | string | Dotted qualified name |
+| `file` | string | Relative path |
+| `start` / `end` | int | Line range |
+
+#### `Run` properties
+
+| Property | Type | Description |
+|---|---|---|
+| `id` | string | UUID for the run |
+| `timestamp` | string | ISO-8601 timestamp |
+| `commit_sha` | string | HEAD SHA at run time |
+| `duration_ms` | float | Wall time in milliseconds |
+| `total_tests` | int | Number of tests collected |
+| `passed` / `failed` | int | Pass / fail counts |
+
+---
+
+### Edge types
+
+| Type | Source → Target | Populated by | Default confidence |
+|---|---|---|---|
+| `DEFINED_IN` | `Function` → `File` | static ingest | — |
+| `DEFINED_IN` | `Test` → `File` | static ingest | — |
+| `CALLS` | `Function` → `Function` | static ingest | 0.6 |
+| `IMPORTS` | `File` → `File` | static ingest | 0.6 |
+| `COVERED_BY` | `Function` → `Test` | coverage / feedback | 0.9 / 1.0 |
+| `FAILED_IN` | `Test` → `Run` | test run | — |
+
+#### Edge properties
+
+**`CALLS`**
+
+| Property | Type | Description |
+|---|---|---|
+| `source` | string | Always `"static"` |
+| `confidence` | float | `0.6` — static edges are capped; only dynamic execution evidence can raise confidence |
+| `evidence_count` | int | Number of times this edge has been confirmed |
+| `last_verified_sha` | string | Commit SHA when last confirmed — used to compute freshness |
+
+**`COVERED_BY`**
+
+| Property | Type | Description |
+|---|---|---|
+| `source` | string | `"coverage"` (dynamic run) or `"miss_repair"` (feedback loop) |
+| `confidence` | float | `0.9` for coverage runs; `1.0` for repair edges |
+| `evidence_count` | int | Incremented on each coverage run that confirms the edge |
+| `last_verified_sha` | string | Commit SHA when last confirmed — drives edge freshness score |
+
+**`IMPORTS`**
+
+| Property | Type | Description |
+|---|---|---|
+| `source` | string | `"static"` |
+| `confidence` | float | `0.6` |
+| `last_verified_sha` | string | Commit SHA |
+
+**`FAILED_IN`**
+
+| Property | Type | Description |
+|---|---|---|
+| `source` | string | `"test_run"` |
+| `error_message` | string | Truncated failure output |
+| `commit_sha` | string | Commit SHA at run time |
+
+---
+
+### Graph schema diagram
+
+```
+┌──────────┐   DEFINED_IN   ┌──────┐   IMPORTS   ┌──────┐
+│ Function │ ─────────────► │ File │ ───────────► │ File │
+└──────────┘                └──────┘              └──────┘
+     │  ▲
+     │  │ CALLS (multi-hop, up to N hops)
+     ▼  │
+┌──────────┐
+│ Function │
+└──────────┘
+     │
+     │ COVERED_BY  (confidence 0.9 dynamic / 1.0 repair)
+     ▼
+┌──────┐   DEFINED_IN   ┌──────┐
+│ Test │ ─────────────► │ File │
+└──────┘                └──────┘
+     │
+     │ FAILED_IN
+     ▼
+┌─────┐
+│ Run │
+└─────┘
+```
+
+### Indexes
+
+Guard automatically creates these FalkorDB indexes on `guard init`:
+
+```cypher
+CREATE INDEX FOR (f:Function) ON (f.id)
+CREATE INDEX FOR (t:Test)     ON (t.id)
+CREATE INDEX FOR (x:File)     ON (x.path)
+CREATE INDEX FOR (r:Run)      ON (r.id)
+CREATE INDEX FOR (m:GuardMeta) ON (m.id)
+```
+
+### Useful graph queries
+
+```cypher
+-- Tests covering a specific function
+MATCH (f:Function {id: "guard_cli/api.py::run"})-[e:COVERED_BY]->(t:Test)
+RETURN t.id, e.confidence, e.source
+ORDER BY e.confidence DESC
+
+-- Multi-hop callers (up to 4 hops)
+MATCH p=(caller:Function)-[:CALLS*1..4]->(target:Function {id: "guard_cli/db.py::write_static"})
+RETURN caller.id, min(length(p)) AS hops
+ORDER BY hops
+
+-- Functions with no test coverage
+MATCH (f:Function)
+WHERE NOT (f)-[:COVERED_BY]->()
+RETURN f.id, f.file
+
+-- Stale coverage edges (confirmed at a different SHA)
+MATCH (f:Function)-[e:COVERED_BY]->(t:Test)
+WHERE e.last_verified_sha <> "HEAD_SHA_HERE"
+RETURN f.id, t.id, e.last_verified_sha
+```
+
+Or via the CLI:
+
+```bash
+guard callers guard_cli/db.py::write_static --hops 4
+guard covering-tests guard_cli/api.py::run --min-confidence 0.8
+guard stats
+```
+
+---
+
+## Trust & Decision Engine
+
+Every Guard decision outputs a `trust` score in `[0, 1]`:
+
+```
+trust = 0.5 × evidence_ratio
+      + 0.3 × freshness
+      + 0.2 × (1 − uncertain_ratio)
+```
+
+| Component | Description |
+|---|---|
+| `evidence_ratio` | Average `best_confidence` across all changed functions |
+| `freshness` | Fraction of `COVERED_BY` edges whose `last_verified_sha` matches HEAD |
+| `uncertain_ratio` | Fraction of changed functions flagged `has_dynamic_dispatch = true` |
+
+### Policy levels
+
+| Trust | Policy | Action |
+|---|---|---|
+| ≥ 0.8 | `subset` | Run only the directly covering tests |
+| 0.5 – 0.8 | `medium` | Covering tests + all tests in the same module |
+| < 0.5 | `run_all` | Full suite |
+
+### Hard overrides (always trigger `run_all`)
+
+| Override key | Trigger condition |
+|---|---|
+| `no_evidence` | Any changed function has zero `COVERED_BY` edges |
+| `test_file_touched` | A test file itself was modified |
+| `dynamic_dispatch` | A changed function uses `getattr` / `eval` (widens to module tests) |
+
+---
+
+## Feedback Loop
+
+When Guard misses a regression, repair the graph immediately:
+
+```bash
+guard feedback \
+  --function "myapp/payments.py::charge" \
+  --test "tests/test_payments.py::test_charge_declined"
+```
+
+This inserts or upgrades a `COVERED_BY` edge with `source="miss_repair"` and `confidence=1.0`. From then on, every Guard decision that touches `charge` will include `test_charge_declined`.
+
+---
+
+## Development
+
+```bash
+# Install with dev extras
+pip install -e ".[dev]"
+
+# Run the full test suite
+pytest
+
+# Run with coverage
+pytest --cov=guard_cli --cov-report=term-missing
+
+# Run Guard on itself
+guard run
+```
+
+### Verification scripts
+
+Standalone integration checks in `tests/verify_*.py`:
+
+```bash
+python tests/verify_t3.py   # static graph integrity
+python tests/verify_t4.py   # coverage evidence
+python tests/verify_t5.py   # decision engine
+```
 
 ---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.
+
+## Links
+
+- [GitHub](https://github.com/thisisvaishnav/guard)
+- [Issue tracker](https://github.com/thisisvaishnav/guard/issues)
+- [Changelog](CHANGELOG.md)
+- [FalkorDB](https://falkordb.com)
