@@ -743,18 +743,6 @@
     "ast_hash": "4eac5acd9318037ee4a57ddbf934478d",
     "semantic_hash": ""
   },
-  "docs/falkordb-safety-layer.html": {
-    "mtime": 1792248211.5675333,
-    "seen": 1792252418.035018,
-    "ast_hash": "97a5b98ce73a6b42b8d308f2344380f2",
-    "semantic_hash": ""
-  },
-  "docs/project_flow_3d.html": {
-    "mtime": 1792248211.5712192,
-    "seen": 1792252418.035019,
-    "ast_hash": "214439d8380661e1a5fa63655fc8ce79",
-    "semantic_hash": ""
-  },
   "docs/falkordb-safety-light.png": {
     "mtime": 1792248211.5688257,
     "seen": 1792252418.0350301,
@@ -852,9 +840,9 @@
     "semantic_hash": ""
   },
   "landing/src/components/install/Badge.tsx": {
-    "mtime": 1792268333.9033427,
-    "seen": 1792268396.856894,
-    "ast_hash": "0894e36b17ceca9cae461bcb11c038ac",
+    "mtime": 1792617264.3421931,
+    "seen": 1792617289.820528,
+    "ast_hash": "c1908363a65d3f18198f0226c32c7654",
     "semantic_hash": ""
   },
   "landing/src/components/install/CodeBlock.tsx": {
@@ -864,9 +852,9 @@
     "semantic_hash": ""
   },
   "landing/src/components/install/InstallTabs.tsx": {
-    "mtime": 1792269178.9808817,
-    "seen": 1792269296.529227,
-    "ast_hash": "5fd2c373dfc1d7be2661e60699b5abf7",
+    "mtime": 1792617268.6820917,
+    "seen": 1792617289.82053,
+    "ast_hash": "2e83ed0eca37d3cde3a9ef5c7719b119",
     "semantic_hash": ""
   },
   "landing/src/components/install/Step.tsx": {
@@ -882,9 +870,9 @@
     "semantic_hash": ""
   },
   "landing/src/data/agents.json": {
-    "mtime": 1792268700.3428934,
-    "seen": 1792268884.121332,
-    "ast_hash": "46bf77ea972e97a8b8e8926093a9a2db",
+    "mtime": 1792617258.110783,
+    "seen": 1792617289.820533,
+    "ast_hash": "fda78bc90ef5a3d321279bb6bdeb91d9",
     "semantic_hash": ""
   },
   "landing/src/lib/utils.ts": {

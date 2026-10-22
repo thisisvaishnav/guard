@@ -6,7 +6,8 @@ const LABELS: Record<string, string> = {
   "coming-soon": "Soon",
 }
 
-export function Badge({ status }: { status: string }) {
+export function Badge({ status }: { status?: string }) {
+  if (!status) return null
   const label = LABELS[status] ?? status
 
   return (

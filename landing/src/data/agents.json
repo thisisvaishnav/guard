@@ -2,7 +2,6 @@
   {
     "id": "claude-code",
     "label": "Claude Code",
-    "badge": "beta",
     "prereq": "Python project with pytest, git, and uv",
     "prereqUrl": "https://docs.astral.sh/uv/",
     "installCmd": "uv tool install guard-cli",
@@ -37,7 +36,6 @@
   {
     "id": "antigravity",
     "label": "Antigravity",
-    "badge": "experimental",
     "prereq": "Python project with pytest, git, and uv",
     "prereqUrl": "https://docs.astral.sh/uv/",
     "installCmd": "uv tool install guard-cli",

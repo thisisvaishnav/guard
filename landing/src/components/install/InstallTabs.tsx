@@ -199,7 +199,7 @@ export function InstallTabs() {
                   <AgentIcon id={a.id} size={18} />
                 </div>
                 <span className="install-tab-name">{a.label}</span>
-                <Badge status={a.badge} />
+                {"badge" in a && a.badge ? <Badge status={String(a.badge)} /> : null}
               </TabsTrigger>
             ))}
             <TabsIndicator className="install-tab-indicator" />
