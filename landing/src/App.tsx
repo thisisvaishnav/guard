@@ -223,7 +223,7 @@ export default function App() {
             Guard runs only the tests a change can break, and blocks your coding agent until they pass.
           </p>
 
-          {/* Bash Command Box with Copy button (White theme) */}
+          {/* Bash Command Box with Copy button */}
           <div className="hero-cmd-container">
             <div className="hero-cmd-box">
               <div className="hero-cmd-dots" aria-hidden="true">
@@ -257,24 +257,25 @@ export default function App() {
             </p>
           </div>
 
-          {/* Factual Proof Line */}
-          <div className="hero-proof-strip">
-            <a href="#stories" className="hero-proof-link">
-              <span className="proof-highlight">0 missed failures</span> across 17 killable mutants on Flask, with <strong>67% less test time</strong> ↗
-            </a>
-          </div>
+          {/* Unified Proof & Works with Meta Row */}
+          <div className="hero-meta-row">
+            <div className="hero-proof-strip">
+              <a href="#stories" className="hero-proof-link">
+                <span className="proof-highlight">0 missed failures</span> across 17 killable mutants on Flask, with <strong>67% less test time</strong> ↗
+              </a>
+            </div>
 
-          {/* Works with strip */}
-          <div className="hero-works-with-strip">
-            <span className="works-with-tag">Works with:</span>
-            <div className="works-with-list">
-              <div className="works-agent-pill">
-                <AgentIcon id="claude-code" size={17} />
-                <span>Claude Code</span>
-              </div>
-              <div className="works-agent-pill">
-                <AgentIcon id="antigravity" size={17} />
-                <span>Antigravity</span>
+            <div className="hero-works-with-strip">
+              <span className="works-with-tag">Works with:</span>
+              <div className="works-with-list">
+                <div className="works-agent-pill">
+                  <AgentIcon id="claude-code" size={17} />
+                  <span>Claude Code</span>
+                </div>
+                <div className="works-agent-pill">
+                  <AgentIcon id="antigravity" size={17} />
+                  <span>Antigravity</span>
+                </div>
               </div>
             </div>
           </div>
@@ -293,7 +294,7 @@ export default function App() {
             <span>HOW IT WORKS</span> THREE-STEP VERIFICATION
           </div>
           <SectionTitle>
-            Explain the workflow in three steps.
+            Targeted safety in three steps.
             <span>From code change to verified safety.</span>
           </SectionTitle>
           <p className="section-lead">
@@ -361,7 +362,7 @@ export default function App() {
       {/* Page 1: Install Section */}
       <section className="install-section" id="install">
         <div className="shell">
-          <div className="eyebrow"><span>01</span> INSTALL &amp; CONNECT</div>
+          <div className="eyebrow"><span>INSTALL</span> RAPID REPOSITORY SETUP</div>
           <SectionTitle>
             Install Guard for your AI coding agent.
             <span>Automatic repository configuration.</span>
@@ -378,7 +379,7 @@ export default function App() {
       <section className="agent-section" id="features">
         <div className="shell">
           <div className="eyebrow">
-            <span>02</span> GRAPH SAFETY LAYER
+            <span>INTELLIGENCE</span> GRAPH SAFETY LAYER
           </div>
           <SectionTitle light>
             Trust-scored test selection
@@ -412,7 +413,7 @@ export default function App() {
                 <b>HIGH TRUST</b>
               </div>
             </article>
-            <article className="agent-card pale">
+            <article className="agent-card card-dark">
               <small>2/4</small>
               <h3>Only tests covering your diff. Nothing else.</h3>
               <p>
@@ -421,7 +422,7 @@ export default function App() {
               </p>
               <ProspectStack />
             </article>
-            <article className="agent-card ink">
+            <article className="agent-card card-dark">
               <small>3/4</small>
               <h3>Three-tier policy with hard safety overrides</h3>
               <p>
@@ -440,7 +441,7 @@ export default function App() {
                 </p>
               </div>
             </article>
-            <article className="agent-card chart-card">
+            <article className="agent-card card-dark chart-card">
               <small>4/4</small>
               <h3>Self-repairing feedback loop</h3>
               <p>
@@ -468,7 +469,7 @@ export default function App() {
       <section className="stories" id="stories">
         <div className="shell">
           <div className="eyebrow">
-            <span>03</span> BENCHMARK &amp; EVALS
+            <span>EVALUATION</span> BENCHMARKS &amp; AUDITS
           </div>
           <SectionTitle light>
             Frozen benchmark on held-out mutants
