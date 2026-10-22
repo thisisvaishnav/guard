@@ -1500,8 +1500,6 @@ code, pre, .install-code, .hero-cmd-code, .terminal-pre {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  animation: installStepStagger 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--step-idx, 1) * 70ms);
 }
 
 .install-step-track {
