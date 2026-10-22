@@ -3,7 +3,7 @@ import { InstallTabs } from "@/components/install/InstallTabs"
 import { TerminalDemo } from "@/components/TerminalDemo"
 import { EyeTracker } from "@/components/EyeTracker"
 import { AgentIcon } from "@/components/install/AgentIcon"
-import { Check, Copy } from "lucide-react"
+import { Check, Copy, Network, GitBranch, ShieldCheck } from "lucide-react"
 
 const GithubIcon = ({ size = 16 }: { size?: number }) => (
   <svg
@@ -112,6 +112,9 @@ export default function App() {
             <span />
           </button>
           <div className={`nav-links ${menuOpen ? "open" : ""}`}>
+            <a href="#workflow" onClick={() => setMenuOpen(false)}>
+              Workflow
+            </a>
             <a href="#install" onClick={() => setMenuOpen(false)}>
               Install
             </a>
@@ -279,6 +282,78 @@ export default function App() {
           {/* Terminal Demonstration */}
           <div className="hero-demo-section">
             <TerminalDemo />
+          </div>
+        </div>
+      </section>
+
+      {/* 3-Step Workflow Section */}
+      <section className="workflow-section" id="workflow">
+        <div className="shell">
+          <div className="eyebrow">
+            <span>HOW IT WORKS</span> THREE-STEP VERIFICATION
+          </div>
+          <SectionTitle>
+            Explain the workflow in three steps.
+            <span>From code change to verified safety.</span>
+          </SectionTitle>
+          <p className="section-lead">
+            Guard connects FalkorDB graph intelligence directly to your agent's test loop. Run only what matters in milliseconds.
+          </p>
+
+          <div className="workflow-grid">
+            <article className="workflow-card">
+              <div className="workflow-card-header">
+                <div className="workflow-step-badge">
+                  <Network size={18} className="workflow-step-icon" aria-hidden="true" />
+                  <span>STEP 01</span>
+                </div>
+                <span className="workflow-capability-tag">guard ingest</span>
+              </div>
+              <h3>1. Analyze</h3>
+              <p className="workflow-desc">
+                Understand the relevant code relationships.
+              </p>
+              <div className="workflow-capability-box">
+                <span className="workflow-capability-label">Product Capability</span>
+                <p>AST static analysis and per-test coverage mapping persisted in a local FalkorDB graph.</p>
+              </div>
+            </article>
+
+            <article className="workflow-card">
+              <div className="workflow-card-header">
+                <div className="workflow-step-badge">
+                  <GitBranch size={18} className="workflow-step-icon" aria-hidden="true" />
+                  <span>STEP 02</span>
+                </div>
+                <span className="workflow-capability-tag">guard run</span>
+              </div>
+              <h3>2. Trace</h3>
+              <p className="workflow-desc">
+                Identify what a change could affect.
+              </p>
+              <div className="workflow-capability-box">
+                <span className="workflow-capability-label">Product Capability</span>
+                <p>Blast-radius graph traversal and trust scoring across git diffs to isolate impacted tests.</p>
+              </div>
+            </article>
+
+            <article className="workflow-card">
+              <div className="workflow-card-header">
+                <div className="workflow-step-badge">
+                  <ShieldCheck size={18} className="workflow-step-icon" aria-hidden="true" />
+                  <span>STEP 03</span>
+                </div>
+                <span className="workflow-capability-tag">guard hook</span>
+              </div>
+              <h3>3. Validate</h3>
+              <p className="workflow-desc">
+                Run targeted tests and surface regressions.
+              </p>
+              <div className="workflow-capability-box">
+                <span className="workflow-capability-label">Product Capability</span>
+                <p>Sub-second targeted test execution with agent-blocking stop hooks and self-repair feedback.</p>
+              </div>
+            </article>
           </div>
         </div>
       </section>
@@ -493,6 +568,7 @@ export default function App() {
           </div>
           <div>
             <b>Navigation</b>
+            <a href="#workflow">Workflow</a>
             <a href="#install">Install</a>
             <a href="#features">Features</a>
             <a href="#stories">Benchmarks</a>

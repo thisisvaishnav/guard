@@ -1,9 +1,9 @@
-# Graph Report - guard  (2026-10-18)
+# Graph Report - guard  (2026-10-22)
 
 ## Corpus Check
-- 130 files · ~143,150 words
+- 130 files · ~107,763 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 53 file(s) not represented in the graph (top: .diff 40, (none) 5, .patch 4)
+- Unclassified: 54 file(s) not represented in the graph (top: .diff 40, (none) 6, .patch 4)
 
 ## Summary
 - 1048 nodes · 2376 edges · 90 communities (49 shown, 41 thin omitted)
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fc4cb445`
+- Built from commit: `f08f989b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
