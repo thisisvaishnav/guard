@@ -215,7 +215,7 @@ export default function App() {
           </a>
 
           <h1 className="hero-headline">
-            Stop AI agents from finishing
+            Guard: Stop AI agents from finishing
             <span>with broken code.</span>
           </h1>
 

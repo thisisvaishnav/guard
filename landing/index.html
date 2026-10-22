@@ -1,11 +1,20 @@
 <!doctype html>
-<html lang="<!-- figma:lang -->">
+<html lang="en">
   <head>
-    <!-- figma:head-start -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ff8364" />
-    <title><!-- figma:title --></title>
+    <title>Guard — Stop AI agents from finishing with broken code</title>
+    <meta
+      name="description"
+      content="Guard is a predictive test execution engine for AI coding agents. Run only the tests a change can break, and block agents until they pass."
+    />
+    <link rel="icon" href="/favicon.svg" />
+    <meta property="og:title" content="Guard — Stop AI agents from finishing with broken code" />
+    <meta
+      property="og:description"
+      content="Guard runs only the tests a change can break, and blocks your coding agent until they pass."
+    />
     <style>
       html {
         overscroll-behavior-y: none;
@@ -22,12 +31,19 @@
         background-color: #f7f5f1;
       }
     </style>
-    <!-- figma:head-end -->
   </head>
   <body>
-    <!-- figma:body-start -->
-    <div id="root"></div>
+    <div id="root">
+      <!-- Semantic static fallback containing the primary topic H1 before hydration -->
+      <header class="hero-content shell" style="max-width: 1200px; margin: 0 auto; padding: 48px 24px; text-align: center;">
+        <h1 class="hero-headline" style="font-size: 48px; line-height: 1.1; margin: 0 0 16px;">
+          Guard: Stop AI agents from finishing with broken code.
+        </h1>
+        <p class="hero-subhead" style="font-size: 18px; color: #525866; max-width: 620px; margin: 0 auto;">
+          Guard runs only the tests a change can break, and blocks your coding agent until they pass.
+        </p>
+      </header>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- figma:body-end -->
   </body>
 </html>
