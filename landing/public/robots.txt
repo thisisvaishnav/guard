@@ -1,2 +1,5 @@
 User-agent: *
 Allow: /
+
+# Prevent crawl budget waste on 404 error page directly
+Disallow: /404.html
