@@ -348,8 +348,8 @@
     "semantic_hash": "86f49fbfb9eb406bbdc5801c2da77e65"
   },
   "README.md": {
-    "mtime": 1792342861.5220673,
-    "seen": 1792523223.116247,
+    "mtime": 1792654412.5918021,
+    "seen": 1792654630.504937,
     "ast_hash": "02d85f41833939a38ca336556c0d403d",
     "semantic_hash": ""
   },
@@ -840,8 +840,8 @@
     "semantic_hash": ""
   },
   "landing/src/components/install/Badge.tsx": {
-    "mtime": 1792617264.3421931,
-    "seen": 1792617289.820528,
+    "mtime": 1792654375.5003889,
+    "seen": 1792654630.504897,
     "ast_hash": "c1908363a65d3f18198f0226c32c7654",
     "semantic_hash": ""
   },
@@ -852,8 +852,8 @@
     "semantic_hash": ""
   },
   "landing/src/components/install/InstallTabs.tsx": {
-    "mtime": 1792617268.6820917,
-    "seen": 1792617289.82053,
+    "mtime": 1792654375.500846,
+    "seen": 1792654630.504899,
     "ast_hash": "2e83ed0eca37d3cde3a9ef5c7719b119",
     "semantic_hash": ""
   },
@@ -870,8 +870,8 @@
     "semantic_hash": ""
   },
   "landing/src/data/agents.json": {
-    "mtime": 1792617258.110783,
-    "seen": 1792617289.820533,
+    "mtime": 1792654375.5020864,
+    "seen": 1792654630.5049012,
     "ast_hash": "fda78bc90ef5a3d321279bb6bdeb91d9",
     "semantic_hash": ""
   },
