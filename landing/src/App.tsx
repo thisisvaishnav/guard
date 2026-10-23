@@ -3,7 +3,7 @@ import { InstallTabs } from "@/components/install/InstallTabs"
 import { TerminalDemo } from "@/components/TerminalDemo"
 import { EyeTracker } from "@/components/EyeTracker"
 import { AgentIcon } from "@/components/install/AgentIcon"
-import { Check, Copy, Network, GitBranch, ShieldCheck } from "lucide-react"
+import { Check, Copy, Network, GitBranch, ShieldCheck, ArrowDown } from "lucide-react"
 
 const GithubIcon = ({ size = 16 }: { size?: number }) => (
   <svg
@@ -302,56 +302,104 @@ export default function App() {
           </p>
 
           <div className="workflow-grid">
+            {/* Step 1: Analyze */}
             <article className="workflow-card">
               <div className="workflow-card-header">
                 <div className="workflow-step-badge">
-                  <Network size={18} className="workflow-step-icon" aria-hidden="true" />
+                  <div className="workflow-step-icon-wrap">
+                    <Network size={16} className="workflow-step-icon" aria-hidden="true" />
+                  </div>
                   <span>STEP 01</span>
                 </div>
-                <span className="workflow-capability-tag">guard ingest</span>
+                <code className="workflow-capability-tag">
+                  <span className="workflow-cmd-prompt">$</span> guard ingest
+                </code>
               </div>
-              <h3>1. Analyze</h3>
-              <p className="workflow-desc">
-                Understand the relevant code relationships.
-              </p>
+              <div className="workflow-card-body">
+                <h3>1. Analyze</h3>
+                <p className="workflow-desc">
+                  Understand the relevant code relationships.
+                </p>
+              </div>
               <div className="workflow-capability-box">
-                <span className="workflow-capability-label">Product Capability</span>
+                <div className="workflow-capability-header">
+                  <span className="workflow-capability-indicator" aria-hidden="true" />
+                  <span className="workflow-capability-label">Product Capability</span>
+                </div>
                 <p>AST static analysis and per-test coverage mapping persisted in a local FalkorDB graph.</p>
               </div>
             </article>
 
+            {/* Mobile Flow Connector: Step 1 -> Step 2 */}
+            <div className="workflow-connector" aria-hidden="true">
+              <div className="workflow-connector-line" />
+              <div className="workflow-connector-node">
+                <ArrowDown size={14} className="workflow-connector-arrow" />
+              </div>
+              <div className="workflow-connector-line" />
+            </div>
+
+            {/* Step 2: Trace */}
             <article className="workflow-card">
               <div className="workflow-card-header">
                 <div className="workflow-step-badge">
-                  <GitBranch size={18} className="workflow-step-icon" aria-hidden="true" />
+                  <div className="workflow-step-icon-wrap">
+                    <GitBranch size={16} className="workflow-step-icon" aria-hidden="true" />
+                  </div>
                   <span>STEP 02</span>
                 </div>
-                <span className="workflow-capability-tag">guard run</span>
+                <code className="workflow-capability-tag">
+                  <span className="workflow-cmd-prompt">$</span> guard run
+                </code>
               </div>
-              <h3>2. Trace</h3>
-              <p className="workflow-desc">
-                Identify what a change could affect.
-              </p>
+              <div className="workflow-card-body">
+                <h3>2. Trace</h3>
+                <p className="workflow-desc">
+                  Identify what a change could affect.
+                </p>
+              </div>
               <div className="workflow-capability-box">
-                <span className="workflow-capability-label">Product Capability</span>
+                <div className="workflow-capability-header">
+                  <span className="workflow-capability-indicator" aria-hidden="true" />
+                  <span className="workflow-capability-label">Product Capability</span>
+                </div>
                 <p>Blast-radius graph traversal and trust scoring across git diffs to isolate impacted tests.</p>
               </div>
             </article>
 
+            {/* Mobile Flow Connector: Step 2 -> Step 3 */}
+            <div className="workflow-connector" aria-hidden="true">
+              <div className="workflow-connector-line" />
+              <div className="workflow-connector-node">
+                <ArrowDown size={14} className="workflow-connector-arrow" />
+              </div>
+              <div className="workflow-connector-line" />
+            </div>
+
+            {/* Step 3: Validate */}
             <article className="workflow-card">
               <div className="workflow-card-header">
                 <div className="workflow-step-badge">
-                  <ShieldCheck size={18} className="workflow-step-icon" aria-hidden="true" />
+                  <div className="workflow-step-icon-wrap">
+                    <ShieldCheck size={16} className="workflow-step-icon" aria-hidden="true" />
+                  </div>
                   <span>STEP 03</span>
                 </div>
-                <span className="workflow-capability-tag">guard hook</span>
+                <code className="workflow-capability-tag">
+                  <span className="workflow-cmd-prompt">$</span> guard hook
+                </code>
               </div>
-              <h3>3. Validate</h3>
-              <p className="workflow-desc">
-                Run targeted tests and surface regressions.
-              </p>
+              <div className="workflow-card-body">
+                <h3>3. Validate</h3>
+                <p className="workflow-desc">
+                  Run targeted tests and surface regressions.
+                </p>
+              </div>
               <div className="workflow-capability-box">
-                <span className="workflow-capability-label">Product Capability</span>
+                <div className="workflow-capability-header">
+                  <span className="workflow-capability-indicator" aria-hidden="true" />
+                  <span className="workflow-capability-label">Product Capability</span>
+                </div>
                 <p>Sub-second targeted test execution with agent-blocking stop hooks and self-repair feedback.</p>
               </div>
             </article>
