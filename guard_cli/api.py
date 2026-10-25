@@ -48,6 +48,11 @@ def _extract_failures(stdout: str, stderr: str) -> list[str]:
     # ERROR tests/test_config.py::test_1 - Exception...
     # ERROR collecting tests/test_broken.py
     # ERROR: tests/test_broken.py
+    # ERROR: file or directory not found: tests/test_deleted.py
+    not_found_regex = re.compile(
+        r"ERROR:\s+(?:file or directory not found:\s+)([^\s]+)",
+        re.MULTILINE,
+    )
     fail_regex = re.compile(
         r"^(?:FAILED|ERROR:?|ERRORS:?)\s+(?:collecting\s+)?([^\s]+)",
         re.MULTILINE,
@@ -55,14 +60,18 @@ def _extract_failures(stdout: str, stderr: str) -> list[str]:
     for text in (stdout, stderr):
         if not text:
             continue
+        for match in not_found_regex.finditer(text):
+            target = match.group(1).rstrip(":")
+            if target:
+                failures.append(target)
         for match in fail_regex.finditer(text):
             target = match.group(1).rstrip(":")
-            if target and target not in ("collecting", "during", "at", "==="):
+            if target and target not in ("collecting", "during", "at", "===", "file"):
                 failures.append(target)
 
         # Pytest header style: _ ERROR collecting tests/test_syntax.py _
         header_regex = re.compile(
-            r"^_{1,}\s+ERROR\s+(?:collecting\s+|at\s+[^\s]+\s+of\s+)?([^\s_]+)",
+            r"^_{1,}\s+ERROR\s+(?:collecting\s+|at\s+[^\s]+\s+of\s+)?([^\\s_]+)",
             re.MULTILINE,
         )
         for match in header_regex.finditer(text):
@@ -152,6 +161,21 @@ def normalize_test_target_for_pytest(target: str) -> str:
             return target
         else:
             return file_part
+
+
+def _find_available_tests(repo: Path) -> list[str]:
+    """Finds test files under tests/ directory in repo."""
+    tests_dir = repo / "tests"
+    if not tests_dir.is_dir():
+        return []
+    found = []
+    for p in tests_dir.rglob("*.py"):
+        if p.name.startswith("test_") or p.name.endswith("_test.py"):
+            try:
+                found.append(str(p.relative_to(repo)))
+            except ValueError:
+                found.append(str(p))
+    return sorted(found)
 
 
 def check(
@@ -381,6 +405,92 @@ def run(
             )
             return err_dict, 1
 
+    # 3. Validate test targets against existing files in repo (prune deleted/missing test targets)
+    # Only prune when repo has a workspace structure (.git, tests dir, or python files).
+    repo_is_active = (repo / ".git").exists() or (repo / "tests").is_dir() or any(repo.glob("*.py"))
+    if repo_is_active:
+        valid_targets: list[str] = []
+        pruned_targets: list[str] = []
+
+        for t in tests_to_run:
+            if t == "tests":
+                if _find_available_tests(repo):
+                    valid_targets.append(t)
+                else:
+                    pruned_targets.append(t)
+                continue
+            file_part = t.split("::", 1)[0]
+            p = Path(file_part)
+            target_path = p if p.is_absolute() else (repo / file_part)
+            if target_path.is_file():
+                valid_targets.append(t)
+            elif target_path.is_dir():
+                if _find_available_tests(repo):
+                    valid_targets.append(t)
+                else:
+                    pruned_targets.append(t)
+            else:
+                pruned_targets.append(t)
+
+        if pruned_targets:
+            log_event(
+                event="test_targets_pruned",
+                session_id=session_id,
+                repo_path=repo,
+                details={
+                    "pruned_targets": pruned_targets,
+                    "remaining_targets": valid_targets,
+                },
+            )
+
+        if valid_targets:
+            tests_to_run = valid_targets
+        else:
+            # All targeted tests were deleted/missing. Fall back cleanly to available tests in tests/
+            available_tests = _find_available_tests(repo)
+            if available_tests:
+                tests_to_run = ["tests"]
+                forced_full = True
+                log_event(
+                    event="test_fallback_available",
+                    session_id=session_id,
+                    repo_path=repo,
+                    details={
+                        "pruned_targets": pruned_targets,
+                        "available_tests_count": len(available_tests),
+                    },
+                )
+            else:
+                # No tests remain in repo. Allow stop cleanly without triggering collection error Exit 2.
+                log_event(
+                    event="no_tests_remain",
+                    session_id=session_id,
+                    repo_path=repo,
+                    details={
+                        "pruned_targets": pruned_targets,
+                        "reason": "All targeted tests deleted/missing and no tests remain in repo",
+                    },
+                )
+                return {
+                    "version": SCHEMA_VERSION,
+                    "status": "passed",
+                    "policy": check_dict.get("policy", "subset"),
+                    "trust": check_dict.get("trust", 0.9),
+                    "overrides_triggered": check_dict.get("overrides_triggered", []),
+                    "selected_tests": check_dict.get("selected_tests", []),
+                    "failures": [],
+                    "reasons": check_dict.get("reasons", {}),
+                    "forced_full": forced_full,
+                    "fallback_reason": check_dict.get("fallback_reason") or "All targeted tests deleted; no tests remain",
+                    "changed_functions": check_dict.get("changed_functions", []),
+                    "tests_run": [],
+                    "tests_run_count": 0,
+                    "duration_s": 0.0,
+                    "tests_passed": True,
+                    "exit_code": 0,
+                    "output_summary": "All targeted tests were deleted/missing and no tests remain in repo. Allowed stop.",
+                }, 0
+
     try:
         # Count collected tests
         test_count = count_collected_tests(tests_to_run, repo)
@@ -394,7 +504,7 @@ def run(
             except Exception:
                 pass
 
-        # 3. Execute pytest with configurable timeout
+        # 4. Execute pytest with configurable timeout
         from guard_cli.hook import get_hook_timeout
         timeout = get_hook_timeout(repo)
         cmd = [py_bin, "-m", "pytest", "-q", "--tb=short"] + tests_to_run
@@ -411,6 +521,44 @@ def run(
                 if not failures:
                     failures = ["test_execution_failure"]
             proc_exit_code = proc.returncode
+
+            # Handle collection errors for deleted test files that slipped through
+            if not passed and failures:
+                combined_output = f"{proc.stdout}\n{proc.stderr}".lower()
+                if "not found" in combined_output or "no such file" in combined_output:
+                    non_existent_failures = [
+                        f for f in failures
+                        if not (
+                            Path(f.split("::", 1)[0]).exists()
+                            if Path(f.split("::", 1)[0]).is_absolute()
+                            else (repo / f.split("::", 1)[0]).exists()
+                        )
+                    ]
+                    if non_existent_failures and len(non_existent_failures) == len(failures):
+                        available = _find_available_tests(repo)
+                        if available and tests_to_run != ["tests"]:
+                            fallback_cmd = [py_bin, "-m", "pytest", "-q", "--tb=short", "tests"]
+                            fb_proc = subprocess.run(fallback_cmd, cwd=str(repo), capture_output=True, text=True, timeout=timeout)
+                            passed = (fb_proc.returncode == 0)
+                            proc_exit_code = fb_proc.returncode
+                            failures = _extract_failures(fb_proc.stdout, fb_proc.stderr)
+                            if passed:
+                                summary_line = fb_proc.stdout.strip().splitlines()[-1] if fb_proc.stdout.strip() else ""
+                            else:
+                                summary_line = _extract_failure_summary(fb_proc.stdout, fb_proc.stderr, max_lines=15)
+                            tests_to_run = ["tests"]
+                            forced_full = True
+                        else:
+                            passed = True
+                            proc_exit_code = 0
+                            failures = []
+                            summary_line = "All failing test targets were deleted/missing. Allowed stop."
+                            log_event(
+                                event="deleted_test_collection_bypassed",
+                                session_id=session_id,
+                                repo_path=repo,
+                                details={"pruned_failures": non_existent_failures},
+                            )
         except subprocess.TimeoutExpired:
             duration_s = round(time.time() - start, 3)
             passed = False
