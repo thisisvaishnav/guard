@@ -9,8 +9,10 @@ Executes when Claude Code attempts to stop/complete a turn:
 6. Fail-open by default if Guard itself crashes.
 """
 from __future__ import annotations
+import io
 import json
 import os
+import select
 import sys
 import subprocess
 from pathlib import Path
@@ -39,6 +41,47 @@ from guard_cli.state import (
 )
 
 
+PROJECT_CONFIG_FILES = {
+    "pyproject.toml",
+    "requirements.txt",
+    "setup.py",
+    "setup.cfg",
+    "tox.ini",
+    "pipfile",
+    "pipfile.lock",
+    "poetry.lock",
+    "pytest.ini",
+    "ruff.toml",
+    ".ruff.toml",
+    ".flake8",
+    "mypy.ini",
+    ".pylintrc",
+    "environment.yml",
+    "environment.yaml",
+    "conda.yaml",
+    "conda.yml",
+    "uv.lock",
+    "pdm.lock",
+}
+
+
+def is_project_config_file(path: str | Path) -> bool:
+    """Checks whether a file path refers to a code-impacting configuration file."""
+    norm = str(path).replace("\\", "/")
+    parts = norm.split("/")
+    filename = parts[-1].lower()
+
+    if filename in PROJECT_CONFIG_FILES:
+        return True
+    if filename == ".env" or filename.startswith(".env."):
+        return True
+    if (filename.endswith(".txt") or filename.endswith(".in")) and any(
+        p.startswith("requirements") for p in parts
+    ):
+        return True
+    return False
+
+
 def _capture_payload(content: str, repo_path: Path | None = None) -> None:
     """Writes the raw stdin payload to .guard/last_payload.json when GUARD_DEBUG_PAYLOAD=1."""
     try:
@@ -50,10 +93,31 @@ def _capture_payload(content: str, repo_path: Path | None = None) -> None:
         pass
 
 
-def read_hook_input() -> dict[str, Any]:
-    """Reads stdin JSON safely if available."""
-    if sys.stdin.isatty():
+def read_hook_input(timeout: float = 0.2) -> dict[str, Any]:
+    """Reads stdin JSON safely if available.
+
+    Uses select-based bounded wait on POSIX platforms to prevent deadlocks when stdin
+    is a pipe or mock stream with delayed/missing EOF.
+    """
+    if sys.stdin is None:
         return {}
+    try:
+        if sys.stdin.isatty():
+            return {}
+    except Exception:
+        return {}
+
+    # Check if data is available on platforms supporting select on stdin (POSIX)
+    try:
+        rlist, _, _ = select.select([sys.stdin], [], [], timeout)
+        if not rlist:
+            return {}
+    except (io.UnsupportedOperation, ValueError, TypeError, OSError):
+        # Fallback if select is unsupported on the stream (e.g. io.StringIO in tests, Windows non-sockets)
+        pass
+    except Exception:
+        pass
+
     try:
         content = sys.stdin.read()
         if not content.strip():
@@ -366,7 +430,7 @@ def check_idle_turn(
             diff_cached = dc_proc.stdout
 
         untracked_files = [
-            l[3:].strip() for l in status_lines if l.startswith("??")
+            l[3:].strip().strip('"') for l in status_lines if l.startswith("??")
         ]
 
         wt_clean = is_working_tree_clean(repo_path)
@@ -376,21 +440,21 @@ def check_idle_turn(
         if wt_clean and not has_commit_changes and not has_diff:
             return True, "clean_tree", None, diff_ref
 
-        # Check if python files were affected
-        py_files: list[str] = []
+        # Check if python files or code-impacting project configuration files were affected
+        code_files: list[str] = []
         # 1. From status
         for line in status_lines:
-            path_part = line[3:].strip()
+            path_part = line[3:].strip().strip('"')
             if " -> " in path_part:
-                sub_paths = [p.strip() for p in path_part.split(" -> ")]
+                sub_paths = [p.strip().strip('"') for p in path_part.split(" -> ")]
             else:
                 sub_paths = [path_part]
             for sp in sub_paths:
                 norm = sp.replace("\\", "/")
                 if norm.startswith(".guard/") or norm == ".guard":
                     continue
-                if norm.endswith(".py"):
-                    py_files.append(norm)
+                if norm.endswith(".py") or is_project_config_file(norm):
+                    code_files.append(norm)
 
         # 2. From diff against diff_ref
         if diff_baseline:
@@ -403,24 +467,24 @@ def check_idle_turn(
             )
             if name_proc.returncode == 0:
                 for line in name_proc.stdout.splitlines():
-                    norm = line.strip().replace("\\", "/")
+                    norm = line.strip().strip('"').replace("\\", "/")
                     if norm.startswith(".guard/") or norm == ".guard":
                         continue
-                    if norm.endswith(".py"):
-                        py_files.append(norm)
+                    if norm.endswith(".py") or is_project_config_file(norm):
+                        code_files.append(norm)
 
         # If working tree was explicitly marked unclean via mock/flag but has no parsed files
         if not wt_clean and not status_lines and not has_diff:
-            py_files.append("simulated_change.py")
+            code_files.append("simulated_change.py")
 
-        if not py_files:
+        if not code_files:
             return True, "non_python_only", None, diff_ref
 
         # Resolve graph
         g = None
         try:
             from guard_cli import db
-            g = db.get_graph(name=graph_name, repo_path=repo_path)
+            g = db.get_graph(graph_name, repo_path=repo_path)
         except Exception:
             pass
 
@@ -434,21 +498,23 @@ def check_idle_turn(
             g=g,
         )
 
-        last_passed = get_last_passed_fingerprint(session_id, repo_path=repo_path)
-        if last_passed and last_passed == fingerprint:
+        last_fp = get_last_passed_fingerprint(session_id, repo_path=repo_path)
+        if last_fp and last_fp == fingerprint:
             return True, "cached_pass", fingerprint, diff_ref
 
-        return False, "python_files_modified", fingerprint, diff_ref
+        has_py = any(f.endswith(".py") for f in code_files)
+        reason = "python_files_modified" if has_py else "config_files_modified"
+        return False, reason, fingerprint, diff_ref
     except Exception as exc:
         return False, f"error_{exc}", None, None
 
 
 def format_failure_summary(report: dict[str, Any], max_lines: int = 30) -> str:
     """Formats a concise <= 30 line error summary for the agent context."""
-    lines = [
-        "GUARD SAFETY CHECK FAILED (Exit 2 - Blocking Stop)",
-        "==================================================",
-        f"Trust Policy : {report.get('policy', 'unknown')} (Trust Score: {report.get('trust', 0.0):.2f})",
+    lines = [\
+        "GUARD SAFETY CHECK FAILED (Exit 2 - Blocking Stop)",\
+        "==================================================",\
+        f"Trust Policy : {report.get('policy', 'unknown')} (Trust Score: {report.get('trust', 0.0):.2f})",\
     ]
     
     overrides = report.get("overrides_triggered", [])
@@ -495,10 +561,23 @@ def format_failure_summary(report: dict[str, Any], max_lines: int = 30) -> str:
         else:
             lines.append(f"Summary      : {summary}")
         
-    footer = [
-        "--------------------------------------------------",
-        "Fix the source code. Do not edit, skip, or delete tests.",
-    ]
+    summary_str = summary or ""
+    is_deleted_test_error = any(
+        "not found" in str(s).lower() or "no such file" in str(s).lower() or "deleted" in str(s).lower()
+        for s in (summary_str, *failures)
+    )
+
+    if is_deleted_test_error:
+        footer = [
+            "--------------------------------------------------",
+            "Test target not found or deleted. Update test graph or remove stale references.",
+        ]
+    else:
+        footer = [
+            "--------------------------------------------------",
+            "Fix the source code. Do not edit, skip, or delete tests.",
+        ]
+
     if max_lines >= len(footer) + 2:
         if len(lines) + len(footer) > max_lines:
             lines = lines[: max_lines - len(footer)]

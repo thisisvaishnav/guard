@@ -266,12 +266,12 @@ def guard_check(
     import time
     start_time = time.time()
 
+    cwd = str(repo_path) if repo_path else None
     if diff_text is None:
         if diff_file:
             diff_text = Path(diff_file).read_text(encoding="utf-8")
         else:
             # Run git diff against baseline_sha if provided, else HEAD
-            cwd = str(repo_path) if repo_path else None
             if baseline_sha:
                 proc = subprocess.run(["git", "diff", baseline_sha], cwd=cwd, capture_output=True, text=True)
                 if proc.returncode == 0:
@@ -290,6 +290,27 @@ def guard_check(
         is_test_file(p)
         for p in file_lines.keys()
     )
+
+    # Inspect untracked files via git status --porcelain
+    try:
+        status_proc = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
+        if status_proc.returncode == 0:
+            untracked_files = [
+                line[3:].strip().strip('"')
+                for line in status_proc.stdout.splitlines()
+                if line.startswith("??")
+            ]
+            test_files_touched = test_files_touched or any(
+                is_test_file(p) for p in untracked_files
+            )
+    except Exception:
+        pass
 
     # Resolve unique repo graph name if available
     if repo_path and (graph_name == "guard" or graph_name is None):
@@ -317,4 +338,3 @@ def guard_check(
 
 
 thin_slice = guard_check
-
