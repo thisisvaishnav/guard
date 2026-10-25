@@ -40,16 +40,87 @@ SCHEMA_VERSION = "1.0"
 
 
 def _extract_failures(stdout: str, stderr: str) -> list[str]:
-    """Parses failing pytest test identifiers from output."""
-    failures = []
+    """Parses failing pytest test identifiers or collection errors from output."""
+    failures: list[str] = []
     # pytest output lines typically look like:
     # FAILED tests/test_config.py::test_config_class - AssertionError...
-    fail_regex = re.compile(r"^FAILED\s+([^\s]+)", re.MULTILINE)
-    for match in fail_regex.finditer(stdout):
-        failures.append(match.group(1))
-    for match in fail_regex.finditer(stderr):
-        failures.append(match.group(1))
+    # ERROR tests/test_syntax.py - SyntaxError...
+    # ERROR tests/test_config.py::test_1 - Exception...
+    # ERROR collecting tests/test_broken.py
+    # ERROR: tests/test_broken.py
+    fail_regex = re.compile(
+        r"^(?:FAILED|ERROR:?|ERRORS:?)\s+(?:collecting\s+)?([^\s]+)",
+        re.MULTILINE,
+    )
+    for text in (stdout, stderr):
+        if not text:
+            continue
+        for match in fail_regex.finditer(text):
+            target = match.group(1).rstrip(":")
+            if target and target not in ("collecting", "during", "at", "==="):
+                failures.append(target)
+
+        # Pytest header style: _ ERROR collecting tests/test_syntax.py _
+        header_regex = re.compile(
+            r"^_{1,}\s+ERROR\s+(?:collecting\s+|at\s+[^\s]+\s+of\s+)?([^\s_]+)",
+            re.MULTILINE,
+        )
+        for match in header_regex.finditer(text):
+            target = match.group(1).strip()
+            if target:
+                failures.append(target)
+
+    # If pytest failed during collection or emitted ERRORS but no specific identifier matched:
+    combined = f"{stdout}\n{stderr}"
+    if not failures:
+        if (
+            "error during collection" in combined
+            or re.search(r"^=*\s*ERRORS\s*=*", combined, re.MULTILINE)
+            or re.search(r"^ERROR\b", combined, re.MULTILINE)
+        ):
+            failures.append("collection_error")
+
     return sorted(list(set(failures)))
+
+
+def _extract_failure_summary(stdout: str, stderr: str, max_lines: int = 15) -> str:
+    """Extracts up to max_lines of actionable failure/traceback summary from pytest output."""
+    raw_text = stdout if stdout.strip() else stderr
+    if not raw_text.strip():
+        return ""
+
+    lines = [line.rstrip() for line in raw_text.splitlines() if line.strip()]
+
+    # Locate where failures or errors start
+    start_idx = 0
+    for i, line in enumerate(lines):
+        if re.search(r"^=+\s*(FAILURES|ERRORS)\s*=+", line):
+            start_idx = i
+            break
+        if re.match(r"^_{2,}\s+(ERROR|test_)", line):
+            start_idx = i
+            break
+        if re.match(r"^(FAILED|ERROR)\s+", line):
+            start_idx = i
+            break
+
+    relevant_lines = lines[start_idx:]
+    if len(relevant_lines) <= max_lines:
+        return "\n".join(relevant_lines)
+
+    # Filter out noisy internal frames if too long
+    filtered = [
+        l for l in relevant_lines
+        if not any(noise in l for noise in ("site-packages/_pytest", "<frozen ", "pluggy/"))
+    ]
+    if len(filtered) <= max_lines:
+        return "\n".join(filtered)
+
+    # If still > max_lines, take head + tail to keep context, error message, and summary
+    head_count = 4
+    tail_count = max(1, max_lines - head_count - 1)
+    truncated = filtered[:head_count] + ["  ... [truncated] ..."] + filtered[-tail_count:]
+    return "\n".join(truncated[:max_lines])
 
 
 def _format_reasons(check_res: CheckResult) -> dict[str, str]:
@@ -333,7 +404,12 @@ def run(
             duration_s = round(time.time() - start, 3)
             passed = (proc.returncode == 0)
             failures = _extract_failures(proc.stdout, proc.stderr)
-            summary_line = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
+            if passed:
+                summary_line = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
+            else:
+                summary_line = _extract_failure_summary(proc.stdout, proc.stderr, max_lines=15)
+                if not failures:
+                    failures = ["test_execution_failure"]
             proc_exit_code = proc.returncode
         except subprocess.TimeoutExpired:
             duration_s = round(time.time() - start, 3)

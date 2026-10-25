@@ -68,10 +68,10 @@ def reset_session_blocks(session_id: str, repo_path: str | Path | None = None) -
     """Resets consecutive blocks for a session back to 0."""
     state = load_state(repo_path)
     sessions = state.setdefault("sessions", {})
-    if session_id in sessions:
-        sessions[session_id]["consecutive_blocks"] = 0
-        sessions[session_id]["last_passed_at"] = time.time()
-        save_state(state, repo_path)
+    session_data = sessions.setdefault(session_id, {})
+    session_data["consecutive_blocks"] = 0
+    session_data["last_passed_at"] = time.time()
+    save_state(state, repo_path)
 
 
 def get_last_passed_fingerprint(session_id: str, repo_path: str | Path | None = None) -> str | None:

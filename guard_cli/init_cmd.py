@@ -90,22 +90,44 @@ def find_repo_root(start_path: str | Path | None = None) -> Path:
 
 def find_test_environment(repo_path: Path) -> Path:
     """Find the target repo's own virtualenv or Python executable."""
-    candidates = [
+    raw_candidates: list[Path] = []
+    if os.environ.get("VIRTUAL_ENV"):
+        raw_candidates.append(Path(os.environ["VIRTUAL_ENV"]))
+    if os.environ.get("CONDA_PREFIX"):
+        raw_candidates.append(Path(os.environ["CONDA_PREFIX"]))
+
+    raw_candidates.extend([
         repo_path / ".venv",
         repo_path / "venv",
         repo_path / "env",
         repo_path / ".env",
-    ]
-    if "VIRTUAL_ENV" in os.environ:
-        candidates.insert(0, Path(os.environ["VIRTUAL_ENV"]))
+    ])
+
+    if sys.prefix:
+        raw_candidates.append(Path(sys.prefix))
+
+    seen: set[Path] = set()
+    candidates: list[Path] = []
+    for c in raw_candidates:
+        resolved = c.resolve() if c.exists() else c
+        if resolved not in seen:
+            seen.add(resolved)
+            candidates.append(c)
 
     for c in candidates:
-        if c.is_dir():
-            # Check bin/python (Unix) or Scripts/python.exe (Windows)
-            py_unix = c / "bin" / "python"
-            py_win = c / "Scripts" / "python.exe"
-            py = py_unix if py_unix.exists() else py_win
-            if py.exists():
+        possible_py: list[Path] = []
+        if c.is_file():
+            possible_py.append(c)
+        elif c.is_dir():
+            possible_py.extend([
+                c / "bin" / "python",
+                c / "Scripts" / "python.exe",
+                c / "python.exe",
+                c / "python",
+            ])
+
+        for py in possible_py:
+            if py.is_file() and os.access(py, os.X_OK):
                 try:
                     res = subprocess.run(
                         [str(py), "-m", "pytest", "--version"],

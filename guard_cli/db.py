@@ -1,6 +1,9 @@
 """FalkorDB connection, complete schema, and batched writers for Guard (Task T2)."""
 from __future__ import annotations
+import json
 import os
+import time
+from pathlib import Path
 from typing import Any, Iterable, Sequence
 from falkordb import FalkorDB
 
@@ -50,7 +53,13 @@ def get_graph(
         from guard_cli.backend import load_config
         cfg = load_config(repo_path)
         name = cfg.get("backend", {}).get("graph_name") or os.getenv("GUARD_GRAPH", GRAPH_NAME)
-    return backend.get_graph(name)
+    g = backend.get_graph(name)
+    if repo_path is not None and g is not None:
+        try:
+            g.repo_path = Path(repo_path)
+        except Exception:
+            pass
+    return g
 
 
 def reset_graph(g) -> None:
@@ -178,38 +187,110 @@ def write_coverage(
     return len(pairs)
 
 
-def update_graph_meta(g) -> None:
-    """Updates Guard metadata generation and timestamp in the graph."""
-    import time
-    if g is None:
+def update_graph_meta(g: Any = None, repo_path: Path | str | None = None) -> None:
+    """Updates Guard metadata generation and timestamp in the graph and repository."""
+    if g is None and repo_path is None:
         return
-    try:
-        ts = time.time()
-        g.query(
-            "MERGE (m:GuardMeta {id: 'meta'}) "
-            "SET m.updated_at = $ts, m.generation = coalesce(m.generation, 0) + 1",
-            {"ts": ts},
-        )
-    except Exception:
-        pass
+    ts = time.time()
+    new_gen = 1
 
-
-def get_graph_state(g) -> dict[str, Any]:
-    """Returns a dictionary summarizing graph state for cache invalidation."""
-    if g is None:
-        return {"status": "none"}
-    try:
-        counts = get_schema_counts(g)
-        meta = {}
+    # 1. Update in-memory fallback on graph object
+    if g is not None:
         try:
-            res = g.query("MATCH (m:GuardMeta {id: 'meta'}) RETURN m.updated_at, m.generation").result_set
-            if res and res[0]:
-                meta = {"updated_at": res[0][0], "generation": res[0][1]}
+            prev = getattr(g, "_guard_meta", None)
+            if isinstance(prev, dict):
+                new_gen = int(prev.get("generation", 0)) + 1
+            g._guard_meta = {
+                "updated_at": ts,
+                "generation": new_gen,
+            }
         except Exception:
             pass
-        return {"counts": counts, "meta": meta}
-    except Exception as exc:
-        return {"error": str(exc)}
+
+    # 2. Persist to repo if repo_path is available
+    target_repo = repo_path or (getattr(g, "repo_path", None) if g is not None else None)
+    if target_repo and isinstance(target_repo, (str, Path)):
+        try:
+            meta_path = Path(target_repo) / ".guard" / "graph_meta.json"
+            meta_path.parent.mkdir(parents=True, exist_ok=True)
+            meta_data = {
+                "updated_at": ts,
+                "generation": new_gen,
+            }
+            meta_path.write_text(json.dumps(meta_data, indent=2) + "\n", encoding="utf-8")
+        except Exception:
+            pass
+
+    # 3. Query FalkorDB if connected
+    if g is not None:
+        try:
+            g.query(
+                "MERGE (m:GuardMeta {id: 'meta'}) "
+                "SET m.updated_at = $ts, m.generation = coalesce(m.generation, 0) + 1",
+                {"ts": ts},
+            )
+        except Exception:
+            pass
+
+
+def get_graph_state(g: Any = None, repo_path: Path | str | None = None) -> dict[str, Any]:
+    """Returns a dictionary summarizing graph state for cache invalidation."""
+    if g is None and repo_path is None:
+        return {"status": "none"}
+
+    meta: dict[str, Any] = {}
+
+    # 1. Check in-memory object metadata (fallback for offline or mocked graph)
+    if g is not None:
+        obj_meta = getattr(g, "_guard_meta", None)
+        if isinstance(obj_meta, dict):
+            meta.update(obj_meta)
+
+    # 2. Check repo-level graph_meta.json or state.json
+    target_repo = repo_path or (getattr(g, "repo_path", None) if g is not None else None)
+    if target_repo and isinstance(target_repo, (str, Path)):
+        try:
+            meta_file = Path(target_repo) / ".guard" / "graph_meta.json"
+            if meta_file.exists():
+                file_meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                if isinstance(file_meta, dict):
+                    if int(file_meta.get("generation", 0)) >= int(meta.get("generation", 0)):
+                        meta.update(file_meta)
+            else:
+                state_file = Path(target_repo) / ".guard" / "state.json"
+                if state_file.exists():
+                    state_data = json.loads(state_file.read_text(encoding="utf-8"))
+                    if isinstance(state_data, dict):
+                        if "ingested_at" in state_data:
+                            meta.setdefault("ingested_at", state_data["ingested_at"])
+                        if "head_sha" in state_data:
+                            meta.setdefault("head_sha", state_data["head_sha"])
+        except Exception:
+            pass
+
+    # 3. FalkorDB query if connected
+    if g is not None:
+        try:
+            res = g.query("MATCH (m:GuardMeta {id: 'meta'}) RETURN m.updated_at, m.generation").result_set
+            if (
+                res
+                and res[0]
+                and isinstance(res[0][0], (int, float, str))
+                and isinstance(res[0][1], (int, float))
+            ):
+                meta["updated_at"] = res[0][0]
+                meta["generation"] = res[0][1]
+        except Exception:
+            pass
+
+    counts: dict[str, int] = {}
+    if g is not None:
+        try:
+            counts = get_schema_counts(g)
+        except Exception:
+            counts = {}
+
+    return {"counts": counts, "meta": meta}
 
 
 
@@ -254,18 +335,20 @@ def write_run(
 
 def get_schema_counts(g) -> dict[str, int]:
     """Return dictionary with counts of all nodes and relationships."""
+    if g is None:
+        return {}
     counts = {}
     for label in ("File", "Function", "Test", "Run"):
         try:
             res = g.query(f"MATCH (n:{label}) RETURN count(n)").result_set
-            counts[label] = res[0][0] if res else 0
+            counts[label] = res[0][0] if (res and isinstance(res[0][0], int)) else 0
         except Exception:
             counts[label] = 0
 
     for rel in ("CALLS", "IMPORTS", "DEFINED_IN", "COVERED_BY", "FAILED_IN"):
         try:
             res = g.query(f"MATCH ()-[e:{rel}]->() RETURN count(e)").result_set
-            counts[rel] = res[0][0] if res else 0
+            counts[rel] = res[0][0] if (res and isinstance(res[0][0], int)) else 0
         except Exception:
             counts[rel] = 0
 
@@ -273,7 +356,7 @@ def get_schema_counts(g) -> dict[str, int]:
         res = g.query(
             "MATCH (f:Function {has_dynamic_dispatch: true}) RETURN count(f)"
         ).result_set
-        counts["dynamic_functions"] = res[0][0] if res else 0
+        counts["dynamic_functions"] = res[0][0] if (res and isinstance(res[0][0], int)) else 0
     except Exception:
         counts["dynamic_functions"] = 0
 

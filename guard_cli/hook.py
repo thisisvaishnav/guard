@@ -212,7 +212,7 @@ def compute_turn_fingerprint(
 
     # 2. Graph state
     try:
-        graph_state = db.get_graph_state(g)
+        graph_state = db.get_graph_state(g, repo_path=repo_path)
     except Exception:
         graph_state = {"status": "unknown"}
 
@@ -471,21 +471,42 @@ def format_failure_summary(report: dict[str, Any], max_lines: int = 30) -> str:
     lines.append(f"Tests Run    : {report.get('tests_run_count', 0)}")
     
     failures = report.get("failures", [])
+    failure_details = report.get("failure_details") or report.get("failure_messages")
     if failures:
         lines.append("Failing Tests:")
         for f in failures[:12]:
-            lines.append(f"  - {f}")
+            if isinstance(f, dict):
+                test_id = f.get("test", f.get("id", str(f)))
+                err = f.get("message") or f.get("error") or ""
+                lines.append(f"  - {test_id}: {err}" if err else f"  - {test_id}")
+            elif isinstance(failure_details, dict) and f in failure_details:
+                lines.append(f"  - {f}: {failure_details[f]}")
+            else:
+                lines.append(f"  - {f}")
         if len(failures) > 12:
             lines.append(f"  ... and {len(failures) - 12} additional failures")
             
     summary = report.get("output_summary")
     if summary:
-        lines.append(f"Summary      : {summary}")
+        if "\n" in summary.strip():
+            lines.append("Failure Details:")
+            for s_line in summary.strip().splitlines():
+                lines.append(f"  {s_line}")
+        else:
+            lines.append(f"Summary      : {summary}")
         
-    lines.append("--------------------------------------------------")
-    lines.append("Fix the source code. Do not edit, skip, or delete tests.")
-    
-    return "\n".join(lines[:max_lines]) + "\n"
+    footer = [
+        "--------------------------------------------------",
+        "Fix the source code. Do not edit, skip, or delete tests.",
+    ]
+    if max_lines >= len(footer) + 2:
+        if len(lines) + len(footer) > max_lines:
+            lines = lines[: max_lines - len(footer)]
+        lines.extend(footer)
+        return "\n".join(lines) + "\n"
+    else:
+        lines.extend(footer)
+        return "\n".join(lines[:max_lines]) + "\n"
 
 
 def run_stop_hook(
@@ -581,20 +602,7 @@ def run_stop_hook(
             )
             return _allow_stop()
 
-        # 2. Loop guard check: Cap at 3 consecutive blocks
-        prior_blocks = get_session_blocks(session_id, repo_path=cwd)
-        if prior_blocks >= 3:
-            msg = "Guard blocked 3 times, handing back to you\n"
-            sys.stderr.write(msg)
-            log_event(
-                event="handed_back",
-                session_id=session_id,
-                repo_path=cwd,
-                details={"consecutive_blocks": prior_blocks},
-            )
-            return _allow_stop(reason=msg.strip())
-
-        # 3. Execute Guard run
+        # 2. Execute Guard run
         try:
             report, exit_code = api.run(
                 repo_path=cwd,
@@ -614,7 +622,7 @@ def run_stop_hook(
             )
             return _allow_stop(reason="Guard skipped: database unreachable")
 
-        # 4. Handle test results
+        # 3. Handle test results
         if exit_code == 0:
             if report.get("fail_open"):
                 return _allow_stop(reason="Guard skipped: database unreachable")
@@ -637,6 +645,7 @@ def run_stop_hook(
         clear_last_passed_fingerprint(session_id, repo_path=cwd)
         new_blocks = record_session_block(session_id, repo_path=cwd)
         if new_blocks > 3:
+            reset_session_blocks(session_id, repo_path=cwd)
             msg = "Guard blocked 3 times, handing back to you\n"
             sys.stderr.write(msg)
             log_event(
