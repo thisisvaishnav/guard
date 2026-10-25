@@ -151,8 +151,9 @@ def test_claude_install_adds_session_start_hook(tmp_path):
     assert ok is True
     data = json.loads((repo / ".claude" / "settings.local.json").read_text(encoding="utf-8"))
     start_hooks = data["hooks"]["SessionStart"]
+    guard_exe = claude.get_guard_executable()
     assert any(
-        sub.get("command") == "guard hook session-start"
+        sub.get("command") == f"{guard_exe} hook session-start"
         for h in start_hooks
         for sub in h.get("hooks", [])
     )
@@ -163,15 +164,17 @@ def test_claude_install_adds_session_start_hook(tmp_path):
     assert "Stop" not in data_after.get("hooks", {})
 
 
-def test_antigravity_install_adds_pre_invocation_hook(tmp_path):
+def test_antigravity_install_adds_session_start_hook(tmp_path):
     repo = tmp_path / "agy_repo"
     repo.mkdir()
     ok, _ = antigravity.install(repo)
     assert ok is True
     data = json.loads((repo / ".agents" / "hooks.json").read_text(encoding="utf-8"))
-    pre = data["guard-stop"]["PreInvocation"]
-    assert any("hook session-start" in h.get("command", "") for h in pre)
-    assert antigravity.status(repo)["pre_invocation_installed"] is True
+    assert "SessionStart" in data["guard-stop"]
+    session_start = data["guard-stop"]["SessionStart"]
+    assert any("hook session-start" in h.get("command", "") for h in session_start)
+    assert "PreInvocation" not in data["guard-stop"]
+    assert antigravity.status(repo)["session_start_installed"] is True
     antigravity.uninstall(repo)
     data_after = json.loads((repo / ".agents" / "hooks.json").read_text(encoding="utf-8"))
     assert "guard-stop" not in data_after

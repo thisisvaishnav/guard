@@ -155,20 +155,23 @@ def install(repo_path: str | Path | None = None, guard_executable: str | None = 
         stop_list = []
         guard_hook["Stop"] = stop_list
 
-    pre_list = guard_hook.setdefault("PreInvocation", [])
-    if not isinstance(pre_list, list):
-        pre_list = []
-        guard_hook["PreInvocation"] = pre_list
-
     session_start_list = guard_hook.setdefault("SessionStart", [])
     if not isinstance(session_start_list, list):
         session_start_list = []
         guard_hook["SessionStart"] = session_start_list
 
+    # Clean up legacy PreInvocation if present in guard-stop
+    if "PreInvocation" in guard_hook and isinstance(guard_hook["PreInvocation"], list):
+        guard_hook["PreInvocation"] = [
+            h for h in guard_hook["PreInvocation"]
+            if not (isinstance(h, dict) and ("hook session-start" in h.get("command", "") or h.get("command") == SESSION_START_COMMAND))
+        ]
+        if not guard_hook["PreInvocation"]:
+            del guard_hook["PreInvocation"]
+
     stop_present = _contains_guard_hook(stop_list, "stop")
-    pre_present = _contains_guard_hook(pre_list, "session-start")
     session_start_present = _contains_guard_hook(session_start_list, "session-start")
-    if stop_present and (pre_present or session_start_present):
+    if stop_present and session_start_present:
         return True, f"Guard hooks are already installed in {hooks_file}"
 
     from guard_cli.hook import get_hook_timeout
@@ -185,18 +188,9 @@ def install(repo_path: str | Path | None = None, guard_executable: str | None = 
             "timeout": timeout,
         })
 
-    # Both SessionStart (fires once at session start per hooks.md) and
-    # PreInvocation (fires before each model call) record the baseline
-    # on first use via `guard hook session-start` safely and idempotently.
+    # SessionStart records the baseline SHA at session start.
     if not session_start_present:
         session_start_list.append({
-            "type": "command",
-            "command": session_start_cmd,
-            "timeout": 30,
-        })
-
-    if not pre_present:
-        pre_list.append({
             "type": "command",
             "command": session_start_cmd,
             "timeout": 30,

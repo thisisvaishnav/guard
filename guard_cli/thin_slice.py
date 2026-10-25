@@ -94,8 +94,34 @@ def parse_unified_diff(diff_text: str) -> dict[str, set[int]]:
     return file_lines
 
 
+def is_test_file(path: str | Path) -> bool:
+    """Check if a file path represents a test file.
+
+    Matches files in test directories (e.g. tests/*, test/*) or test filename conventions
+    (e.g. test_*.py, *_test.py, test.py).
+    Does NOT match non-test files merely containing the substring 'test' (e.g. attestation.py, contest.py).
+    """
+    p_str = str(path).replace("\\", "/")
+    parts = p_str.split("/")
+    filename = parts[-1].lower()
+    dir_parts = [part.lower() for part in parts[:-1]]
+
+    # 1. Directory is a test directory
+    if any(d in ("test", "tests") for d in dir_parts) or p_str.startswith("tests/") or p_str.startswith("test/"):
+        return True
+
+    # 2. Filename matches test naming conventions
+    stem = Path(filename).stem
+    if filename.startswith("test_") or stem.endswith("_test") or stem == "test":
+        return True
+
+    return False
+
+
 def resolve_changed_functions(g, file_lines: dict[str, set[int]]) -> list[ChangedFunction]:
     """Queries FalkorDB to find Function nodes spanning the modified lines."""
+    if g is None:
+        return []
     changed_funcs: dict[str, ChangedFunction] = {}
 
     for file_path, lines in file_lines.items():
@@ -109,7 +135,10 @@ def resolve_changed_functions(g, file_lines: dict[str, set[int]]) -> list[Change
             "WHERE f.file = $file OR f.file ENDS WITH $file OR $file ENDS WITH f.file "
             "RETURN f.id, f.file, f.name, f.start, f.end, coalesce(f.no_evidence, false), coalesce(f.has_dynamic_dispatch, false)"
         )
-        res = g.query(q, {"file": file_path}).result_set
+        try:
+            res = g.query(q, {"file": file_path}).result_set
+        except Exception:
+            res = []
 
         for fid, ffile, fname, start, end, no_evidence, dyn in res:
             start_i = int(start)
@@ -258,7 +287,7 @@ def guard_check(
     
     # Check if test files were touched
     test_files_touched = any(
-        "test" in p.lower() or p.startswith("tests/")
+        is_test_file(p)
         for p in file_lines.keys()
     )
 
@@ -285,3 +314,7 @@ def guard_check(
     )
     result.execution_time_ms = round((time.time() - start_time) * 1000.0, 2)
     return result
+
+
+thin_slice = guard_check
+

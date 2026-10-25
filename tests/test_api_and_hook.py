@@ -352,10 +352,11 @@ def test_claude_settings_install_creates_file_and_hook(temp_repo):
         
     assert "hooks" in data
     assert "Stop" in data["hooks"]
+    guard_exe = claude.get_guard_executable()
     assert any(
         h.get("matcher") == ""
         and any(
-            sub.get("command") == "guard hook stop" and sub.get("type") == "command"
+            sub.get("command") == f"{guard_exe} hook stop" and sub.get("type") == "command"
             for sub in h.get("hooks", [])
         )
         for h in data["hooks"]["Stop"]
@@ -396,7 +397,8 @@ def test_claude_settings_merge_preserves_existing_config(temp_repo):
     assert merged["hooks"]["Stop"][0]["command"] == "echo 'custom pre-stop'"
     guard_entry = merged["hooks"]["Stop"][1]
     assert guard_entry.get("matcher") == ""
-    assert guard_entry["hooks"][0]["command"] == "guard hook stop"
+    guard_exe = claude.get_guard_executable()
+    assert guard_entry["hooks"][0]["command"] == f"{guard_exe} hook stop"
     
     # Backup file should exist
     bak_file = temp_repo / ".claude" / "settings.local.json.bak"

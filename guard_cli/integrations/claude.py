@@ -8,7 +8,9 @@ Installs, uninstalls, and checks status of Guard's Stop hook in Claude Code sett
 """
 from __future__ import annotations
 import json
+import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,20 @@ HOOK_COMMAND = "guard hook stop"
 SESSION_START_COMMAND = "guard hook session-start"
 SESSION_START_MATCHER = "startup|resume|clear|compact|fork"
 DEFAULT_HOOK_TIMEOUT = 180
+
+
+def get_guard_executable() -> str:
+    """Returns the absolute path to the guard executable."""
+    guard_bin = shutil.which("guard")
+    if guard_bin:
+        return str(Path(guard_bin).resolve())
+    py_dir = Path(sys.executable).parent
+    guard_candidate = py_dir / "guard"
+    if guard_candidate.is_file() and os.access(guard_candidate, os.X_OK):
+        return str(guard_candidate.resolve())
+    if sys.argv and Path(sys.argv[0]).name in ("guard", "guard-cli"):
+        return str(Path(sys.argv[0]).resolve())
+    return "guard"
 
 
 def get_settings_path(repo_path: str | Path | None = None, shared: bool = False) -> Path:
@@ -30,13 +46,28 @@ def get_settings_path(repo_path: str | Path | None = None, shared: bool = False)
     return local_file
 
 
+def _matches_command(cmd: str, target: str) -> bool:
+    if not isinstance(cmd, str):
+        return False
+    if cmd == target:
+        return True
+    if target in (HOOK_COMMAND, "stop", "hook stop"):
+        return "hook stop" in cmd
+    if target in (SESSION_START_COMMAND, "session-start", "hook session-start"):
+        return "hook session-start" in cmd
+    return target in cmd
+
+
 def _contains_guard_hook(item: Any, command: str = HOOK_COMMAND) -> bool:
     if isinstance(item, dict):
-        if item.get("command") == command:
+        if _matches_command(item.get("command", ""), command):
             return True
         inner = item.get("hooks", [])
         if isinstance(inner, list):
-            return any(isinstance(h, dict) and h.get("command") == command for h in inner)
+            return any(
+                isinstance(h, dict) and _matches_command(h.get("command", ""), command)
+                for h in inner
+            )
     return False
 
 
@@ -101,7 +132,11 @@ def check_all_settings(repo_path: str | Path | None = None) -> dict[str, Any]:
     }
 
 
-def install(repo_path: str | Path | None = None, shared: bool = False) -> tuple[bool, str]:
+def install(
+    repo_path: str | Path | None = None,
+    shared: bool = False,
+    guard_executable: str | None = None,
+) -> tuple[bool, str]:
     """Installs the Guard Stop hook into Claude Code settings.
     
     Returns:
@@ -151,6 +186,10 @@ def install(repo_path: str | Path | None = None, shared: bool = False) -> tuple[
     from guard_cli.hook import get_hook_timeout
     timeout = get_hook_timeout(repo_path)
 
+    guard_exe = guard_executable or get_guard_executable()
+    stop_cmd = f"{guard_exe} hook stop"
+    session_start_cmd = f"{guard_exe} hook session-start"
+
     # Claude Code expects matcher objects with a 'hooks' list
     # (https://docs.anthropic.com/en/docs/claude-code/hooks).
     # For the Stop event no tool matcher applies, so "matcher" is empty.
@@ -160,7 +199,7 @@ def install(repo_path: str | Path | None = None, shared: bool = False) -> tuple[
             "hooks": [
                 {
                     "type": "command",
-                    "command": HOOK_COMMAND,
+                    "command": stop_cmd,
                     "timeout": timeout,
                 }
             ]
@@ -174,7 +213,7 @@ def install(repo_path: str | Path | None = None, shared: bool = False) -> tuple[
             "hooks": [
                 {
                     "type": "command",
-                    "command": SESSION_START_COMMAND,
+                    "command": session_start_cmd,
                     "timeout": timeout,
                 }
             ]
