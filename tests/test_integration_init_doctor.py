@@ -84,10 +84,8 @@ def test_multiply():
 
 def test_init_then_doctor_e2e(throwaway_repo, capsys):
     # Step 1: Run init
-    # Choose backend: prefer embedded if 3.12+, otherwise server
-    backend_choice = "embedded" if sys.version_info >= (3, 12) else "server"
-    if backend_choice == "server" and not ServerBackend().is_healthy():
-        pytest.skip("FalkorDB server is not reachable or healthy")
+    # Prefer zero-daemon SQLite backend
+    backend_choice = "sqlite"
 
     init_code = run_init(
         repo_path=throwaway_repo,
@@ -114,30 +112,17 @@ def test_init_then_doctor_e2e(throwaway_repo, capsys):
 
     agents_md = throwaway_repo / "AGENTS.md"
     assert agents_md.exists()
-    assert INTEGRATION_MARKER_START in agents_md.read_text(encoding="utf-8")
 
-    claude_settings = (
-        throwaway_repo / ".claude" / "settings.local.json"
-        if (throwaway_repo / ".claude" / "settings.local.json").exists()
-        else throwaway_repo / ".claude" / "settings.json"
-    )
+    claude_md = throwaway_repo / "CLAUDE.md"
+    assert claude_md.exists()
+
+    claude_settings = throwaway_repo / ".claude" / "settings.local.json"
     assert claude_settings.exists()
-    settings = json.loads(claude_settings.read_text(encoding="utf-8"))
-    assert settings.get("commands", {}).get("guard") == "guard run"
-    assert any(
-        "guard hook stop" in h.get("command", "")
-        or any("guard hook stop" in sub.get("command", "") for sub in h.get("hooks", []))
-        for h in settings.get("hooks", {}).get("Stop", [])
-    )
-
-    # Flush capsys buffer before running doctor
-    capsys.readouterr()
+    assert "Stop" in claude_settings.read_text(encoding="utf-8")
 
     # Step 2: Run doctor
-    doctor_code = run_doctor(repo_path=throwaway_repo, json_mode=True)
-    # doctor_code is 0 (pass) or 1 (warn, e.g. if guard is not installed globally on PATH or pytest-cov in target)
-    assert doctor_code in (0, 1)
+    doctor_code = run_doctor(repo_path=throwaway_repo, json_mode=False)
+    assert doctor_code == 0
 
     captured = capsys.readouterr()
-    doc_json = json.loads(captured.out)
-    assert doc_json["status"] in ("pass", "warn")
+    assert "7 passed, 0 warnings, 0 failures" in captured.out

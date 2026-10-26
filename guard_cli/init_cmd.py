@@ -4,7 +4,7 @@ Steps:
 1. Find the repo (git root + test configuration)
 2. Find the test environment (target repo's own virtualenv / python)
 3. Check pytest-cov (offer to install if missing, never silent)
-4. Start/resolve backend (Server, Docker, or Embedded)
+4. Start/resolve backend (SQLite, Server, Docker, or Embedded)
 5. Static ingest (fast static parsing with rich progress summary)
 6. Baseline run (time 1 pytest run, estimate 3x cost, exclude failing tests)
 7. Coverage ingest (per-test coverage using target environment)
@@ -197,10 +197,12 @@ def setup_backend(
 ) -> tuple[GraphBackend, str]:
     """Start and configure backend for repository."""
     graph_name = get_repo_graph_name(repo_path)
-    backend = resolve_backend(preference=preference, repo_path=repo_path, autostart=True)
+    pref = preference or "sqlite"
+    backend = resolve_backend(preference=pref, repo_path=repo_path, autostart=True)
 
     desc = backend.describe()
-    console.print(f"[bold green]Backend selected:[/bold green] [cyan]{backend.name}[/cyan] ({desc.get('status') or desc.get('connection_str') or desc.get('data_path')})")
+    location_info = desc.get("status") or desc.get("connection_str") or desc.get("data_path") or desc.get("path")
+    console.print(f"[bold green]Backend selected:[/bold green] [cyan]{backend.name}[/cyan] ({location_info})")
 
     # Store in .guard/config.toml
     cfg = {
@@ -209,6 +211,7 @@ def setup_backend(
             "host": desc.get("host", "localhost"),
             "port": desc.get("port", 6379),
             "graph_name": graph_name,
+            "path": desc.get("path", ""),
         }
     }
     save_config(repo_path, cfg)
@@ -221,7 +224,7 @@ def run_static_ingest(
     backend: GraphBackend,
     commit_sha: str | None = None,
 ) -> Any:
-    """Analyze static repository structure and ingest into FalkorDB."""
+    """Analyze static repository structure and ingest into graph."""
     from guard_cli.ingest.static import analyze_repo
     from guard_cli import db
 
@@ -334,11 +337,14 @@ def record_state(
     # Record in graph
     try:
         g = backend.get_graph(graph_name)
-        g.query(
-            """MERGE (s:RepoState {graph: $graph})
-               SET s.head_sha = $sha, s.ingested_at = $ts""",
-            {"graph": graph_name, "sha": commit_sha, "ts": ts},
-        )
+        if hasattr(g, "update_graph_meta"):
+            g.update_graph_meta(commit_sha=commit_sha)
+        else:
+            g.query(
+                """MERGE (s:RepoState {graph: $graph})
+                   SET s.head_sha = $sha, s.ingested_at = $ts""",
+                {"graph": graph_name, "sha": commit_sha, "ts": ts},
+            )
     except Exception:
         pass
 

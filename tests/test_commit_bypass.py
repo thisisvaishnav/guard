@@ -12,7 +12,8 @@ from guard_cli.state import set_last_verified_sha, set_baseline_sha, load_state
 
 def test_committed_flask_mutant_hook_exits_2():
     flask_dir = Path("target_repos/flask").resolve()
-    assert flask_dir.exists(), f"Flask repo not found at {flask_dir}"
+    if not flask_dir.exists():
+        pytest.skip(f"Flask repo not found at {flask_dir}")
 
     session_id = "test_commit_bypass_session"
 
