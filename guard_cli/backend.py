@@ -2,13 +2,16 @@
 
 Provides:
 - GraphBackend interface (ABC)
+- SQLiteBackend: manages embedded SQLite in .guard/graph.db (zero daemon default)
 - ServerBackend: connects to existing FalkorDB server (e.g. localhost:6379)
 - DockerBackend: manages dedicated docker container 'guard-falkordb' on port 6390
 - EmbeddedBackend: manages embedded FalkorDBLite in ~/.guard/data/ (Python 3.12+)
 - Backend resolution and fallback chain
 - Configuration storage in .guard/config.toml
 """
+
 from __future__ import annotations
+
 import abc
 import hashlib
 import os
@@ -32,6 +35,7 @@ DEFAULT_DOCKER_PORT = 6390
 DEFAULT_DOCKER_CONTAINER = "guard-falkordb"
 DEFAULT_DOCKER_IMAGE = "falkordb/falkordb:latest"
 DEFAULT_DOCKER_VOLUME = "guard-data:/data"
+GRAPH_NAME = os.getenv("GUARD_GRAPH", "guard")
 
 
 def get_repo_graph_name(repo_path: str | Path | None = None) -> str:
@@ -64,7 +68,6 @@ def _parse_simple_toml(content: str) -> dict[str, Any]:
             key, val = line.split("=", 1)
             key = key.strip()
             val = val.strip()
-            # Parse primitives
             if val.startswith('"') and val.endswith('"'):
                 val = val[1:-1]
             elif val.startswith("'") and val.endswith("'"):
@@ -94,9 +97,9 @@ def load_config(repo_path: str | Path | None = None) -> dict[str, Any]:
     return _parse_simple_toml(content)
 
 
-def save_config(repo_path: str | Path, config: dict[str, Any]) -> Path:
+def save_config(repo_path: str | Path | None, config: dict[str, Any]) -> Path:
     """Saves configuration to .guard/config.toml."""
-    base = Path(repo_path).resolve()
+    base = Path(repo_path).resolve() if repo_path else Path.cwd()
     guard_dir = base / ".guard"
     guard_dir.mkdir(parents=True, exist_ok=True)
     cfg_file = guard_dir / "config.toml"
@@ -128,18 +131,69 @@ def save_config(repo_path: str | Path, config: dict[str, Any]) -> Path:
     return cfg_file
 
 
+def check_embedded_platform_support() -> tuple[bool, str]:
+    """Checks whether the current operating system and C library satisfy FalkorDBLite requirements.
+
+    Requirements:
+    - Python 3.12+
+    - macOS 15+ (Sequoia or newer)
+    - Linux with glibc >= 2.39
+    """
+    if sys.platform not in ("darwin", "linux") and not sys.platform.startswith("linux"):
+        return False, (
+            f"Embedded backend (FalkorDBLite) is not supported on platform '{sys.platform}'. "
+            f"no embedded build for this platform, use Docker or a server"
+        )
+
+    if sys.version_info < (3, 12):
+        return False, (
+            f"Embedded backend (FalkorDBLite) requires Python 3.12 or newer. "
+            f"Current interpreter is Python {sys.version.split()[0]}. "
+            f"no embedded build for this platform, use Docker or a server"
+        )
+
+    if sys.platform == "darwin":
+        import platform
+        mac_ver = platform.mac_ver()[0]
+        if mac_ver:
+            try:
+                major = int(mac_ver.split(".")[0])
+                if major < 15:
+                    return False, (
+                        f"Embedded backend (FalkorDBLite) requires macOS 15 or newer (current: macOS {mac_ver}). "
+                        f"no embedded build for this platform, use Docker or a server"
+                    )
+            except (ValueError, IndexError):
+                pass
+    elif sys.platform.startswith("linux"):
+        import platform
+        libc_name, libc_ver = platform.libc_ver()
+        if libc_name == "glibc" and libc_ver:
+            try:
+                parts = [int(p) for p in libc_ver.split(".")[:2]]
+                if tuple(parts) < (2, 39):
+                    return False, (
+                        f"Embedded backend (FalkorDBLite) requires glibc 2.39 or newer (current: {libc_name} {libc_ver}). "
+                        f"no embedded build for this platform, use Docker or a server"
+                    )
+            except (ValueError, IndexError):
+                pass
+
+    return True, ""
+
+
 class GraphBackend(abc.ABC):
-    """Abstract interface for FalkorDB backends."""
+    """Abstract interface for Guard backends."""
 
     @property
     @abc.abstractmethod
     def name(self) -> str:
-        """Name of backend: 'server', 'docker', or 'embedded'."""
+        """Name of backend: 'sqlite', 'server', 'docker', or 'embedded'."""
         pass
 
     @abc.abstractmethod
     def connect(self) -> Any:
-        """Return connected FalkorDB client."""
+        """Return connected client or connection handle."""
         pass
 
     @abc.abstractmethod
@@ -154,30 +208,117 @@ class GraphBackend(abc.ABC):
 
     @abc.abstractmethod
     def get_graph(self, graph_name: str) -> Any:
-        """Return FalkorDB graph object for given name."""
+        """Return graph or GraphStore handle."""
         pass
+
+    def is_available(self) -> bool:
+        return True
 
     def close(self) -> None:
         """Release any held resources."""
         pass
 
 
+class SQLiteBackend(GraphBackend):
+    """Zero-daemon default backend using embedded SQLite in .guard/graph.db."""
+
+    def __init__(self, repo_path: Path | str | None = None) -> None:
+        self.repo_path = Path(repo_path).resolve() if repo_path else Path.cwd()
+        self._stores: dict[str, Any] = {}
+
+    @property
+    def name(self) -> str:
+        return "sqlite"
+
+    def is_available(self) -> bool:
+        try:
+            import sqlite3
+            return True
+        except ImportError:
+            return False
+
+    def connect(self) -> Any:
+        db_path = self.repo_path / ".guard" / "graph.db"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        import sqlite3
+        return sqlite3.connect(str(db_path))
+
+    def is_healthy(self) -> bool:
+        try:
+            import sqlite3
+            db_path = self.repo_path / ".guard" / "graph.db"
+            if not db_path.exists():
+                return True
+            conn = sqlite3.connect(str(db_path))
+            conn.execute("SELECT 1")
+            conn.close()
+            return True
+        except Exception:
+            return False
+
+    def describe(self) -> dict[str, Any]:
+        db_path = self.repo_path / ".guard" / "graph.db"
+        return {
+            "type": "sqlite",
+            "path": str(db_path),
+            "healthy": self.is_healthy(),
+            "zero_daemon": True,
+        }
+
+    def get_graph(self, graph_name: str) -> Any:
+        from guard_cli.store.sqlite import SQLiteGraphStore
+
+        if graph_name and graph_name != "guard" and not graph_name.startswith("guard_"):
+            db_path = Path.home() / ".guard" / "graphs" / f"{graph_name}.db"
+        else:
+            db_path = self.repo_path / ".guard" / "graph.db"
+
+        cache_key = str(db_path)
+        if cache_key not in self._stores:
+            self._stores[cache_key] = SQLiteGraphStore(db_path=db_path)
+        return self._stores[cache_key]
+
+    def close(self) -> None:
+        for store in self._stores.values():
+            try:
+                store.close()
+            except Exception:
+                pass
+        self._stores.clear()
+
+
 class ServerBackend(GraphBackend):
     """Connects to an existing FalkorDB server instance."""
 
-    def __init__(self, host: str = DEFAULT_SERVER_HOST, port: int = DEFAULT_SERVER_PORT):
+    def __init__(
+        self,
+        host: str = DEFAULT_SERVER_HOST,
+        port: int = DEFAULT_SERVER_PORT,
+        url: str | None = None,
+    ):
         self.host = host
         self.port = int(port)
+        self.url = url
         self._client: Any = None
 
     @property
     def name(self) -> str:
         return "server"
 
+    def is_available(self) -> bool:
+        try:
+            from falkordb import FalkorDB  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
     def connect(self) -> Any:
         if self._client is None:
             from falkordb import FalkorDB
-            self._client = FalkorDB(host=self.host, port=self.port)
+            if self.url:
+                self._client = FalkorDB.from_url(self.url)
+            else:
+                self._client = FalkorDB(host=self.host, port=self.port)
         return self._client
 
     def is_healthy(self) -> bool:
@@ -227,9 +368,11 @@ class DockerBackend(GraphBackend):
     def name(self) -> str:
         return "docker"
 
+    def is_available(self) -> bool:
+        return self.docker_available()
+
     @staticmethod
     def docker_available() -> bool:
-        """Check if docker CLI is available and docker daemon is reachable."""
         if not shutil.which("docker"):
             return False
         try:
@@ -244,12 +387,19 @@ class DockerBackend(GraphBackend):
             return False
 
     def container_status(self) -> str | None:
-        """Returns 'running', 'exited', or None if container does not exist."""
         if not shutil.which("docker"):
             return None
         try:
             res = subprocess.run(
-                ["docker", "ps", "-a", "--filter", f"name=^/{self.container_name}$", "--format", "{{.Status}}"],
+                [
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--filter",
+                    f"name=^/{self.container_name}$",
+                    "--format",
+                    "{{.Status}}",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -264,7 +414,6 @@ class DockerBackend(GraphBackend):
             return None
 
     def start_container(self) -> bool:
-        """Starts existing container or launches new container."""
         if not self.docker_available():
             return False
 
@@ -273,7 +422,6 @@ class DockerBackend(GraphBackend):
             return True
 
         if status == "exited":
-            # Restart existing container
             res = subprocess.run(
                 ["docker", "start", self.container_name],
                 capture_output=True,
@@ -283,19 +431,22 @@ class DockerBackend(GraphBackend):
             if res.returncode != 0:
                 return False
         else:
-            # Run new container
             cmd = [
-                "docker", "run", "-d",
-                "--name", self.container_name,
-                "-v", self.volume,
-                "-p", f"{self.port}:6379",
+                "docker",
+                "run",
+                "-d",
+                "--name",
+                self.container_name,
+                "-v",
+                self.volume,
+                "-p",
+                f"{self.port}:6379",
                 self.image,
             ]
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if res.returncode != 0:
                 return False
 
-        # Wait up to 10 seconds for container to answer healthcheck
         for _ in range(20):
             time.sleep(0.5)
             if self.is_healthy():
@@ -338,71 +489,21 @@ class DockerBackend(GraphBackend):
         self._client = None
 
 
-def check_embedded_platform_support() -> tuple[bool, str]:
-    """Checks whether the current operating system and C library satisfy FalkorDBLite requirements.
-    
-    Requirements:
-    - Python 3.12+
-    - macOS 15+ (Sequoia or newer)
-    - Linux with glibc >= 2.39
-    """
-    if sys.platform not in ("darwin", "linux") and not sys.platform.startswith("linux"):
-        return False, (
-            f"Embedded backend (FalkorDBLite) is not supported on platform '{sys.platform}'. "
-            f"no embedded build for this platform, use Docker or a server"
-        )
-
-    if sys.version_info < (3, 12):
-        return False, (
-            f"Embedded backend (FalkorDBLite) requires Python 3.12 or newer. "
-            f"Current interpreter is Python {sys.version.split()[0]}. "
-            f"no embedded build for this platform, use Docker or a server"
-        )
-
-    if sys.platform == "darwin":
-        import platform
-        mac_ver = platform.mac_ver()[0]
-        if mac_ver:
-            try:
-                major = int(mac_ver.split(".")[0])
-                if major < 15:
-                    return False, (
-                        f"Embedded backend (FalkorDBLite) requires macOS 15 or newer (current: macOS {mac_ver}). "
-                        f"no embedded build for this platform, use Docker or a server"
-                    )
-            except (ValueError, IndexError):
-                pass
-    elif sys.platform.startswith("linux"):
-        import platform
-        libc_name, libc_ver = platform.libc_ver()
-        if libc_name == "glibc" and libc_ver:
-            try:
-                parts = [int(p) for p in libc_ver.split(".")[:2]]
-                if tuple(parts) < (2, 39):
-                    return False, (
-                        f"Embedded backend (FalkorDBLite) requires glibc 2.39 or newer (current: {libc_name} {libc_ver}). "
-                        f"no embedded build for this platform, use Docker or a server"
-                    )
-            except (ValueError, IndexError):
-                pass
-
-    return True, ""
-
-
 class EmbeddedBackend(GraphBackend):
     """Manages an embedded FalkorDBLite instance (Python 3.12+ on supported platforms)."""
 
-    def __init__(self, data_path: str | Path | None = None):
+    def __init__(self, data_path: str | Path | None = None, data_dir: str | Path | None = None):
         ok, msg = check_embedded_platform_support()
         if not ok:
             raise RuntimeError(msg)
 
-        if data_path is None:
+        path_to_use = data_path or data_dir
+        if path_to_use is None:
             base_dir = Path.home() / ".guard" / "data"
             base_dir.mkdir(parents=True, exist_ok=True)
             self.db_path = base_dir / "falkordb.rdb"
         else:
-            self.db_path = Path(data_path).resolve()
+            self.db_path = Path(path_to_use).resolve()
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._client: Any = None
@@ -410,6 +511,15 @@ class EmbeddedBackend(GraphBackend):
     @property
     def name(self) -> str:
         return "embedded"
+
+    def is_available(self) -> bool:
+        if sys.version_info < (3, 12):
+            return False
+        try:
+            import falkordblite  # noqa: F401
+            return True
+        except ImportError:
+            return False
 
     def connect(self) -> Any:
         if self._client is None:
@@ -478,41 +588,50 @@ def resolve_backend(
 ) -> GraphBackend:
     """Resolve backend using preference, repository config, or fallback chain.
 
-    Fallback chain order:
-    1. Explicit preference or .guard/config.toml preference
-    2. Existing server (localhost:6379 or configured FALKORDB_PORT)
-    3. Docker container (guard-falkordb on port 6390)
-    4. Embedded (FalkorDBLite, Python 3.12+)
+    Priority:
+    1. CLI preference flag (--backend)
+    2. .guard/config.toml [backend] type
+    3. Fallback chain: sqlite (zero daemon default) -> server -> docker -> embedded
     """
+    # Accommodate callers passing (repo_path=...) or positional (repo_path, preference)
+    if isinstance(preference, (Path, str)) and "/" in str(preference):
+        repo_path, preference = preference, repo_path  # type: ignore
+
     cfg = load_config(repo_path)
     b_cfg = cfg.get("backend", {})
 
-    pref = preference or b_cfg.get("type")
+    target = preference or b_cfg.get("type")
     host = b_cfg.get("host") or os.getenv("FALKORDB_HOST", DEFAULT_SERVER_HOST)
     port = int(b_cfg.get("port") or os.getenv("FALKORDB_PORT", DEFAULT_SERVER_PORT))
 
-    # 1. Explicit preference
-    if pref:
-        pref = pref.lower().strip()
-        if pref == "server":
-            return ServerBackend(host=host, port=port)
-        elif pref == "docker":
+    if target:
+        target = str(target).lower().strip()
+        if target == "sqlite":
+            return SQLiteBackend(repo_path=repo_path)
+        elif target == "server":
+            url = b_cfg.get("url")
+            return ServerBackend(host=host, port=port, url=url)
+        elif target == "docker":
             d_port = int(b_cfg.get("port", DEFAULT_DOCKER_PORT))
             b = DockerBackend(port=d_port)
             if autostart and not b.is_healthy():
                 b.start_container()
             return b
-        elif pref == "embedded":
+        elif target == "embedded":
             return EmbeddedBackend()
         else:
-            raise ValueError(f"Unknown backend preference: '{pref}'. Choose 'server', 'docker', or 'embedded'.")
+            raise ValueError(f"Unknown backend preference: '{target}'. Choose 'sqlite', 'server', 'docker', or 'embedded'.")
 
-    # 2. Existing server check
+    # Default: SQLite zero daemon
+    sqlite_b = SQLiteBackend(repo_path=repo_path)
+    if sqlite_b.is_available():
+        return sqlite_b
+
+    # Fallback: Server -> Docker -> Embedded
     srv = ServerBackend(host=host, port=port)
     if srv.is_healthy():
         return srv
 
-    # 3. Docker check
     if DockerBackend.docker_available():
         dock = DockerBackend(port=DEFAULT_DOCKER_PORT)
         if autostart:
@@ -521,7 +640,6 @@ def resolve_backend(
         elif dock.is_healthy():
             return dock
 
-    # 4. Embedded fallback check
     if sys.version_info >= (3, 12):
         try:
             emb = EmbeddedBackend()
@@ -530,5 +648,21 @@ def resolve_backend(
         except Exception:
             pass
 
-    # Default fallback: return ServerBackend so caller receives connection details/errors
-    return srv
+    return sqlite_b
+
+
+_active_backend: GraphBackend | None = None
+
+
+def set_backend(backend: GraphBackend | None) -> None:
+    """Explicitly set active GraphBackend instance."""
+    global _active_backend
+    _active_backend = backend
+
+
+def get_backend(repo_path: Path | str | None = None) -> GraphBackend:
+    """Return active backend or resolve according to environment and config."""
+    global _active_backend
+    if _active_backend is not None:
+        return _active_backend
+    return resolve_backend(repo_path=repo_path)

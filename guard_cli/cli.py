@@ -244,7 +244,7 @@ def main(argv=None) -> int:
 
     ini = sub.add_parser("init", help="Initialize Guard for repository")
     ini.add_argument("repo", nargs="?", default=None, help="target repository path (default: current directory)")
-    ini.add_argument("--backend", choices=["server", "docker", "embedded"], default=None, help="database backend")
+    ini.add_argument("--backend", choices=["sqlite", "server", "docker", "embedded"], default=None, help="database backend")
     ini.add_argument("--skip-coverage", action="store_true", help="skip per-test coverage ingestion")
     ini.add_argument("-y", "--yes", action="store_true", help="non-interactive mode accepting all defaults")
     ini.add_argument("--agents", default="claude,cursor,codex,antigravity", help="comma-separated agents to configure")

@@ -20,7 +20,7 @@ def record_miss(
     """Records a missed failure by repairing the graph with a miss_repair edge.
 
     Args:
-        g: FalkorDB graph instance
+        g: GraphStore or FalkorDB graph instance
         function_id: ID of the function where the fault/change occurred
         test_id: ID of the test that failed and was missed
         new_confidence: Confidence score for the repair edge (default: 1.0)
@@ -28,6 +28,9 @@ def record_miss(
     Returns:
         Dict reporting the repair event including old and new confidence.
     """
+    if hasattr(g, "record_miss_repair"):
+        return g.record_miss_repair(function_id, test_id, new_confidence=new_confidence)
+
     # 1. Query existing edge if present
     q_existing = (
         "MATCH (f:Function {id: $fid})-[e:COVERED_BY]->(t:Test {id: $tid}) "
@@ -83,5 +86,4 @@ def record_miss(
         "new_confidence": new_confidence,
         "source": "miss_repair",
         "previous_source": prev_source,
-        "timestamp": ts,
     }

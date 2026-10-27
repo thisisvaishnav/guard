@@ -54,20 +54,20 @@ _SAMPLE_DIFF = """--- a/pkg/mod.py
 
 
 @pytest.fixture
-def seeded_guard_graph():
+def seeded_guard_graph(temp_repo):
     """Seeds a dedicated graph so check() exercises the 'select' path without
     depending on an externally pre-populated 'guard' graph (which may lack
     COVERED_BY evidence and silently fall back to run-all)."""
-    backend = db.get_backend()
+    backend = db.get_backend(repo_path=temp_repo)
     if not backend.is_healthy():
-        pytest.skip("FalkorDB server is not reachable")
+        pytest.skip("Backend is not reachable")
     try:
-        g = db.get_graph("guard_api_check_test", backend=backend)
+        g = db.get_graph("guard_api_check_test", backend=backend, repo_path=temp_repo)
         db.reset_graph(g)
-        g = db.get_graph("guard_api_check_test", backend=backend)
+        g = db.get_graph("guard_api_check_test", backend=backend, repo_path=temp_repo)
         db.ensure_schema(g)
     except Exception as exc:
-        pytest.skip(f"FalkorDB server error: {exc}")
+        pytest.skip(f"Backend error: {exc}")
     db.write_static(
         g,
         StaticResult(

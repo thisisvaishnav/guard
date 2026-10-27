@@ -2,7 +2,7 @@
 
 Runs the test suite 3 times to measure test flakiness, collects per-test
 coverage contexts, and writes COVERED_BY edges (confidence 0.9), Run nodes,
-and no_evidence flags to FalkorDB.
+and no_evidence flags to FalkorDB or SQLite.
 """
 from __future__ import annotations
 import os
@@ -52,7 +52,7 @@ class CoverageResult:
 
 
 def normalize_test_id(raw_test_id: str) -> str:
-    """Normalize pytest context test_id to match FalkorDB Test node ID.
+    """Normalize pytest context test_id to match Test node ID.
     
     Examples:
         tests/test_basic.py::test_method_route[get] -> tests/test_basic.py::test_method_route
@@ -211,7 +211,7 @@ def read_coverage_contexts(
     falkor_functions: list[tuple[str, str, int, int]],  # (id, file, start, end)
     flaky_tests: set[str] | None = None,
 ) -> tuple[list[dict[str, str]], set[str], set[str]]:
-    """Reads coverage contexts and maps lines to FalkorDB Function nodes.
+    """Reads coverage contexts and maps lines to Function nodes.
     
     Returns:
         (coverage_pairs, covered_function_ids, uncovered_function_ids)
@@ -279,14 +279,18 @@ def ingest_coverage(
     1. Runs suite 3 times, measuring flake rate.
     2. Collects per-test coverage contexts on run 1.
     3. CHECKPOINT: Inspects coverage rows before DB write.
-    4. Writes COVERED_BY edges, Run nodes, and sets no_evidence flags in FalkorDB.
+    4. Writes COVERED_BY edges, Run nodes, and sets no_evidence flags.
     """
     repo = Path(repo_path).resolve()
-    g = db.get_graph(graph_name)
+    g = db.get_graph(graph_name, repo_path=repo)
 
-    # 1. Fetch functions from FalkorDB
-    funcs_res = g.query("MATCH (f:Function) RETURN f.id, f.file, f.start, f.end").result_set
-    falkor_funcs = [(r[0], r[1], int(r[2]), int(r[3])) for r in funcs_res]
+    # 1. Fetch functions from database
+    if hasattr(g, "get_all_functions"):
+        funcs = g.get_all_functions()
+        falkor_funcs = [(f.id, f.file, f.start, f.end) for f in funcs]
+    else:
+        funcs_res = g.query("MATCH (f:Function) RETURN f.id, f.file, f.start, f.end").result_set
+        falkor_funcs = [(r[0], r[1], int(r[2]), int(r[3])) for r in funcs_res]
     print(f"[Coverage Ingest] Loaded {len(falkor_funcs)} functions from graph '{graph_name}'.")
 
     # 2. Run test suite 3 times
@@ -334,10 +338,10 @@ def ingest_coverage(
 
     # -----------------------------------------------------------------
     # CHECKPOINT (Required by Part D and T4):
-    # After the coverage reader produces rows, before writing to FalkorDB.
+    # After the coverage reader produces rows, before writing to database.
     # -----------------------------------------------------------------
     print("=" * 60)
-    print("CHECKPOINT: Coverage Reader Summary (before FalkorDB write)")
+    print("CHECKPOINT: Coverage Reader Summary (before database write)")
     print(f"  - Total (Function, Test) pairs generated: {len(pairs)}")
     print(f"  - Covered functions: {len(covered_funcs)} / {len(falkor_funcs)}")
     print(f"  - Uncovered functions (no_evidence): {len(uncovered_funcs)} / {len(falkor_funcs)}")
@@ -345,8 +349,8 @@ def ingest_coverage(
     print(f"  - Recorded test runs: {len(runs)}")
     print("=" * 60)
 
-    # 5. Write to FalkorDB
-    print(f"[Coverage Ingest] Writing coverage data to FalkorDB graph '{graph_name}'...")
+    # 5. Write to database
+    print(f"[Coverage Ingest] Writing coverage data to graph '{graph_name}'...")
     _write_to_falkordb(g, cov_result, commit_sha=commit_sha)
 
     # Cleanup temporary coverage file
@@ -357,7 +361,7 @@ def ingest_coverage(
 
 
 def _write_to_falkordb(g, cov_res: CoverageResult, commit_sha: str | None = None) -> None:
-    """Writes runs, flake rates, COVERED_BY edges, and no_evidence flags to FalkorDB."""
+    """Writes runs, flake rates, COVERED_BY edges, and no_evidence flags to graph."""
     # 1. Write Run nodes and failures
     for r in cov_res.runs:
         run_data = {
@@ -372,16 +376,19 @@ def _write_to_falkordb(g, cov_res: CoverageResult, commit_sha: str | None = None
         db.write_run(g, run_data, failures=r.failures)
 
     # 2. Update flake_rate on Test nodes
-    flake_rows = [{"test_id": t_id, "rate": rate} for t_id, rate in cov_res.test_flake_rates.items()]
-    for b in db._batches(flake_rows):
-        g.query(
-            """UNWIND $rows AS r
-               MATCH (t:Test {id: r.test_id})
-               SET t.flake_rate = r.rate""",
-            {"rows": b},
-        )
-    # Ensure any Test node not in flake_rows gets default flake_rate = 0.0
-    g.query("MATCH (t:Test) WHERE t.flake_rate IS NULL SET t.flake_rate = 0.0")
+    if hasattr(g, "set_test_flake_rates"):
+        g.set_test_flake_rates(cov_res.test_flake_rates)
+    else:
+        flake_rows = [{"test_id": t_id, "rate": rate} for t_id, rate in cov_res.test_flake_rates.items()]
+        for b in db._batches(flake_rows):
+            g.query(
+                """UNWIND $rows AS r
+                   MATCH (t:Test {id: r.test_id})
+                   SET t.flake_rate = r.rate""",
+                {"rows": b},
+            )
+        # Ensure any Test node not in flake_rows gets default flake_rate = 0.0
+        g.query("MATCH (t:Test) WHERE t.flake_rate IS NULL SET t.flake_rate = 0.0")
 
     # 3. Write COVERED_BY edges (confidence 0.9)
     written_pairs = db.write_coverage(
@@ -393,22 +400,28 @@ def _write_to_falkordb(g, cov_res: CoverageResult, commit_sha: str | None = None
     print(f"  -> Written {written_pairs} COVERED_BY edges (confidence=0.9).")
 
     # 4. Set no_evidence flags on Function nodes
-    uncovered_rows = [{"id": fid} for fid in cov_res.uncovered_functions]
-    for b in db._batches(uncovered_rows):
-        g.query(
-            """UNWIND $rows AS r
-               MATCH (f:Function {id: r.id})
-               SET f.no_evidence = true""",
-            {"rows": b},
+    if hasattr(g, "set_function_evidence_flags"):
+        g.set_function_evidence_flags(
+            covered_ids=cov_res.covered_functions,
+            uncovered_ids=cov_res.uncovered_functions,
         )
+    else:
+        uncovered_rows = [{"id": fid} for fid in cov_res.uncovered_functions]
+        for b in db._batches(uncovered_rows):
+            g.query(
+                """UNWIND $rows AS r
+                   MATCH (f:Function {id: r.id})
+                   SET f.no_evidence = true""",
+                {"rows": b},
+            )
 
-    covered_rows = [{"id": fid} for fid in cov_res.covered_functions]
-    for b in db._batches(covered_rows):
-        g.query(
-            """UNWIND $rows AS r
-               MATCH (f:Function {id: r.id})
-               SET f.no_evidence = false""",
-            {"rows": b},
-        )
+        covered_rows = [{"id": fid} for fid in cov_res.covered_functions]
+        for b in db._batches(covered_rows):
+            g.query(
+                """UNWIND $rows AS r
+                   MATCH (f:Function {id: r.id})
+                   SET f.no_evidence = false""",
+                {"rows": b},
+            )
 
     print("  -> Updated no_evidence flags on all Function nodes.")
