@@ -3,6 +3,10 @@ import { InstallTabs } from "@/components/install/InstallTabs"
 import { TerminalDemo } from "@/components/TerminalDemo"
 import { EyeTracker } from "@/components/EyeTracker"
 import { AgentIcon } from "@/components/install/AgentIcon"
+import { TaglineReveal } from "@/components/TaglineReveal"
+import { DiffSimulator } from "@/components/DiffSimulator"
+import { FaqSection } from "@/components/FaqSection"
+import { FinalCta } from "@/components/FinalCta"
 import { Check, Copy, Network, GitBranch, ShieldCheck, ArrowDown } from "lucide-react"
 
 const GithubIcon = ({ size = 16 }: { size?: number }) => (
@@ -111,9 +115,12 @@ export default function App() {
             <span />
             <span />
           </button>
-          <div className={`nav-links ${menuOpen ? "open" : ""}`}>
+          <div className={`nav-links ${menuOpen ? "open" : ""}`}>\
             <a href="#workflow" onClick={() => setMenuOpen(false)}>
               Workflow
+            </a>
+            <a href="#demo" onClick={() => setMenuOpen(false)}>
+              Simulator
             </a>
             <a href="#install" onClick={() => setMenuOpen(false)}>
               Install
@@ -123,6 +130,9 @@ export default function App() {
             </a>
             <a href="#stories" onClick={() => setMenuOpen(false)}>
               Benchmarks
+            </a>
+            <a href="#faq" onClick={() => setMenuOpen(false)}>
+              FAQ
             </a>
             <a
               href="https://github.com/thisisvaishnav/guard"
@@ -193,34 +203,19 @@ export default function App() {
         </div>
 
         <div className="hero-content shell">
-          <a
-            className="yc-badge"
-            href="https://falkordb.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Powered by FalkorDB"
-          >
-            <img
-              src="/assets/falkordb.svg"
-              alt="FalkorDB"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 0,
-                display: "block",
-              }}
-            />
-            <span>Powered by</span>
-            <em>FalkorDB</em>
-          </a>
+          <div className="hero-zero-daemon-badge">
+            <span className="hero-zero-daemon-dot" aria-hidden="true" />
+            <span>Zero Daemons</span>
+            <strong>Embedded SQLite · 0 MB RAM</strong>
+          </div>
 
           <h1 className="hero-headline">
-            Guard: Stop AI agents from finishing
-            <span>with broken code.</span>
+            Stop AI coding agents from
+            <span>shipping broken code.</span>
           </h1>
 
           <p className="hero-subhead">
-            Guard runs only the tests a change can break, and blocks your coding agent until they pass.
+            Guard runs only the tests a change can break in milliseconds, mechanically blocking your coding agent until they pass. Zero Docker, 100% local.
           </p>
 
           {/* Bash Command Box with Copy button */}
@@ -253,7 +248,7 @@ export default function App() {
               </button>
             </div>
             <p className="hero-privacy-line">
-              Runs locally. Your code never leaves your machine.
+              Runs locally with zero external background processes. Your code never leaves your machine.
             </p>
           </div>
 
@@ -261,7 +256,7 @@ export default function App() {
           <div className="hero-meta-row">
             <div className="hero-proof-strip">
               <a href="#stories" className="hero-proof-link">
-                <span className="proof-highlight">0 missed failures</span> across 17 killable mutants on Flask, with <strong>67% less test time</strong> ↗
+                <span className="proof-highlight">0 missed failures</span> on Flask · <strong>94.8% test reduction</strong> on Bottle (363 tests) ↗
               </a>
             </div>
 
@@ -298,7 +293,7 @@ export default function App() {
             <span>From code change to verified safety.</span>
           </SectionTitle>
           <p className="section-lead">
-            Guard connects FalkorDB graph intelligence directly to your agent's test loop. Run only what matters in milliseconds.
+            Guard connects embedded SQLite graph intelligence directly to your agent's test loop. Run only what matters in milliseconds.
           </p>
 
           <div className="workflow-grid">
@@ -326,7 +321,7 @@ export default function App() {
                   <span className="workflow-capability-indicator" aria-hidden="true" />
                   <span className="workflow-capability-label">Product Capability</span>
                 </div>
-                <p>AST static analysis and per-test coverage mapping persisted in a local FalkorDB graph.</p>
+                <p>AST static analysis and per-test coverage mapping persisted in an embedded SQLite graph at .guard/graph.db.</p>
               </div>
             </article>
 
@@ -363,7 +358,7 @@ export default function App() {
                   <span className="workflow-capability-indicator" aria-hidden="true" />
                   <span className="workflow-capability-label">Product Capability</span>
                 </div>
-                <p>Blast-radius graph traversal and trust scoring across git diffs to isolate impacted tests.</p>
+                <p>Blast-radius graph traversal via recursive CTEs and trust scoring across git diffs to isolate impacted tests in &lt;20ms.</p>
               </div>
             </article>
 
@@ -400,10 +395,30 @@ export default function App() {
                   <span className="workflow-capability-indicator" aria-hidden="true" />
                   <span className="workflow-capability-label">Product Capability</span>
                 </div>
-                <p>Sub-second targeted test execution with agent-blocking stop hooks and self-repair feedback.</p>
+                <p>Sub-second targeted test execution with agent-blocking stop hooks, zero external daemons, and self-repair feedback.</p>
               </div>
             </article>
           </div>
+        </div>
+      </section>
+
+      {/* Mandatory Tagline Reveal Section */}
+      <TaglineReveal />
+
+      {/* Interactive Blast-Radius Simulator */}
+      <section className="diff-simulator-section" id="demo">
+        <div className="shell">
+          <div className="eyebrow">
+            <span>LIVE INTERACTIVE SIMULATOR</span> REAL-TIME BLAST RADIUS
+          </div>
+          <SectionTitle>
+            Test selection simulator.
+            <span>Explore how Guard reasons across git diffs.</span>
+          </SectionTitle>
+          <p className="section-lead">
+            Select different code change scenarios to watch Guard traverse AST callers, evaluate trust scores, and isolate tests in milliseconds.
+          </p>
+          <DiffSimulator />
         </div>
       </section>
 
@@ -417,7 +432,7 @@ export default function App() {
           </SectionTitle>
           <p className="section-lead">
             Select your agent. Run the command in your project root directory.
-            Restart the agent and verify the installation. All code stays on your local system.
+            Restart the agent and verify the installation. All code stays on your local system with zero background daemons.
           </p>
           <InstallTabs />
         </div>
@@ -465,8 +480,8 @@ export default function App() {
               <small>2/4</small>
               <h3>Only tests covering your diff. Nothing else.</h3>
               <p>
-                Every test is mapped to modified functions via live FalkorDB
-                graph traversals.
+                Every test is mapped to modified functions via embedded SQLite
+                recursive graph traversals (or optional FalkorDB server).
               </p>
               <ProspectStack />
             </article>
@@ -520,21 +535,21 @@ export default function App() {
             <span>EVALUATION</span> BENCHMARKS &amp; AUDITS
           </div>
           <SectionTitle light>
-            Frozen benchmark on held-out mutants
-            <span>Proves safety &amp; speed.</span>
+            Proven benchmarks on real repositories
+            <span>Tested on pallets/flask &amp; bottle.</span>
           </SectionTitle>
           <div className="metrics">
             <div>
               <b>0.0%</b>
-              <span>Escape rate on held-out mutants (0/17 killable)</span>
+              <span>Escape rate on held-out mutants (0/17 killable on Flask)</span>
             </div>
             <div>
-              <b>67.3%</b>
-              <span>Test-time saved vs run-all on pallets/flask</span>
+              <b>94.8%</b>
+              <span>Test reduction on Bottle (from 363 to 19 tests in 0.28s)</span>
             </div>
             <div>
-              <b>&lt;10ms</b>
-              <span>Graph decision latency</span>
+              <b>18ms</b>
+              <span>Query latency with embedded SQLite WAL (0 MB RAM)</span>
             </div>
           </div>
           <div className="quotes">
@@ -557,7 +572,7 @@ export default function App() {
               <div className="quote-mark">“</div>
               <blockquote>
                 Mutant m08 escaped under the same-file heuristic because the
-                fault crossed module boundaries. Guard traversed the FalkorDB
+                fault crossed module boundaries. Guard traversed the call
                 graph and caught it immediately in 0.13s.
               </blockquote>
               <footer>
@@ -571,21 +586,27 @@ export default function App() {
             <article>
               <div className="quote-mark">“</div>
               <blockquote>
-                Engineering Rule R9 strictly enforced: tasks verified only by
-                independent verifier sessions with fresh context. Zero
-                self-graded claims.
+                Tested on bottle (363 tests): Guard ingested 10,885 edges in 1.4s
+                and selected the exact 19 affected tests in 18ms, reducing test suite
+                execution time by 94.8%.
               </blockquote>
               <footer>
-                <span className="avatar-letter">KS</span>
+                <span className="avatar-letter">BT</span>
                 <span>
-                  <b>Verification Gate</b>
-                  <small>reports/verify_t8.md</small>
+                  <b>Scalability Benchmark</b>
+                  <small>bottle/bottle (363 tests)</small>
                 </span>
               </footer>
             </article>
           </div>
         </div>
       </section>
+
+      {/* Developer FAQ Section */}
+      <FaqSection />
+
+      {/* Risk Reversal Final Conversion CTA */}
+      <FinalCta />
 
       {/* Footer */}
       <footer className="footer">
@@ -595,9 +616,9 @@ export default function App() {
               <EyeTracker size={30} shape="Cube" />
               <span>guard</span>
             </a>
-            <p>Graph-powered safety layer for AI coding agents.</p>
+            <p>Embedded predictive test execution engine for AI coding agents.</p>
             <div className="footer-falkor-credit">
-              <span>Built on </span>
+              <span>Zero-daemon embedded SQLite engine · Optional </span>
               <a
                 href="https://falkordb.com"
                 target="_blank"
@@ -613,20 +634,24 @@ export default function App() {
                 />
                 <strong>FalkorDB</strong>
               </a>
+              <span> server backend supported</span>
             </div>
           </div>
           <div>
             <b>Navigation</b>
             <a href="#workflow">Workflow</a>
+            <a href="#demo">Simulator</a>
             <a href="#install">Install</a>
             <a href="#features">Features</a>
             <a href="#stories">Benchmarks</a>
+            <a href="#faq">FAQ</a>
             <a href="https://github.com/thisisvaishnav/guard" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
           </div>
           <div>
             <b>Product</b>
+            <a href="#demo">Interactive Simulator</a>
             <a href="#features">Graph Safety Layer</a>
             <a href="#features">Trust Scoring</a>
             <a href="#stories">Evaluation Report</a>
@@ -649,8 +674,8 @@ export default function App() {
           </div>
         </div>
         <div className="shell footer-bottom">
-          <span>© 2026 Guard. Open-source software.</span>
-          <span>Tested on pallets/flask · Built on FalkorDB</span>
+          <span>© 2026 Guard. Open-source software (MIT).</span>
+          <span>Tested on pallets/flask &amp; bottle · Embedded SQLite with zero background daemons</span>
         </div>
       </footer>
     </main>
