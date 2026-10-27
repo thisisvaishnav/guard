@@ -5,6 +5,31 @@ All notable changes to Guard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-10-27
+
+### Added
+- **Zero-Daemon Embedded SQLite Architecture (`.guard/graph.db`)**:
+  - Replaced the hard requirement for Docker containers and external FalkorDB servers with standard library `sqlite3`.
+  - Embedded storage operates with **0 MB background RAM** and **zero background daemons**.
+  - Multi-hop blast-radius traversal implemented using SQLite Recursive Common Table Expressions (`WITH RECURSIVE`).
+  - Sub-20ms query latency with WAL mode (`PRAGMA journal_mode = WAL`) and optimized indexes on functions, calls, and coverage mappings.
+- **Modern Landing Page & Interactive Diff Simulator**:
+  - Full interactive Blast-Radius simulator demonstrating AST static analysis -> SQLite CTE traversal -> Targeted test execution.
+  - Scroll-illuminated Tagline Reveal component (`landing/src/components/TaglineReveal.tsx`).
+  - Developer FAQ accordion covering zero daemons, offline privacy, and fail-closed safety invariants.
+  - Upgraded typography to Geist Variable with balanced headers and responsive mobile layout adhering to core design principles.
+- **Multi-Backend Abstraction**:
+  - Added `GraphStore` and `GraphBackend` abstraction layers supporting `sqlite` (default), `server` (remote FalkorDB), `docker`, and `embedded` (FalkorDBLite).
+- **Bottle & Flask Empirical Benchmarks**:
+  - Demonstrated 94.8% test reduction on Bottle (363 tests) with 100% regression capture.
+  - Zero missed failures on Pallets Flask benchmark suite.
+
+### Fixed
+- **Tagline Word Spacing**: Fixed inter-word whitespace collapse in animated tagline text.
+- **Header Navigation Glitch**: Eliminated stray character in navigation bar preceding "Workflow".
+- **Pre-Hydration Reload Flash**: Removed static fallback `#root` header block in `index.html` preventing momentary text flash on page refresh.
+- **Hook Robustness & Stdin Deadlock**: Hardened non-blocking stdin ingestion and loop guard mechanisms.
+
 ## [0.1.4] - 2026-10-18
 
 ### Fixed
@@ -58,10 +83,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial public release of Guard: graph-powered test selection and safety layer for AI coding agents.
 - FalkorDB graph backend support: Server (`localhost:6379`), Docker (`guard-falkordb`), and Embedded (`falkordblite`).
-- AST diff analyzer and call-graph traversal for Python codebases.
-- Per-test dynamic coverage ingestion via pytest and `pytest-cov`.
-- Pre-emptive hard safety overrides (touched test files, missing dynamic evidence, dynamic dispatch).
-- Continuous Trust Score policy routing: Targeted Subset ($\ge 0.8$), Medium Expansion ($0.5 - 0.8$), and Full Suite fallback ($< 0.5$).
-- Claude Code Stop hook integration with loop guard (capped at 3 consecutive blocks) and fail-open resilience.
-- Self-healing feedback loop with `guard feedback` for missed test failure repairs.
-- CLI commands: `guard init`, `guard doctor`, `guard run`, `guard check`, `guard hook`, `guard feedback`, `guard covering-tests`, `guard stats`.
