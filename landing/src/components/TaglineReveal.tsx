@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, Fragment } from "react"
 
 const WORDS = [
   { text: "Every", highlight: false },
@@ -60,17 +60,19 @@ export function TaglineReveal() {
           {WORDS.map((word, idx) => {
             const isLit = idx < activeCount
             return (
-              <span
-                key={`${word.text}-${idx}`}
-                className={`tagline-word ${isLit ? "lit" : ""} ${
-                  word.highlight && isLit ? "highlight" : ""
-                }`}
-                style={{
-                  transitionDelay: `${idx * 15}ms`,
-                }}
-              >
-                {word.text}{" "}
-              </span>
+              <Fragment key={`${word.text}-${idx}`}>
+                <span
+                  className={`tagline-word ${isLit ? "lit" : ""} ${
+                    word.highlight && isLit ? "highlight" : ""
+                  }`}
+                  style={{
+                    transitionDelay: `${idx * 15}ms`,
+                  }}
+                >
+                  {word.text}
+                </span>
+                {idx < WORDS.length - 1 ? " " : ""}
+              </Fragment>
             )
           })}
         </p>

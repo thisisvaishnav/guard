@@ -115,7 +115,7 @@ export default function App() {
             <span />
             <span />
           </button>
-          <div className={`nav-links ${menuOpen ? "open" : ""}`}>\
+          <div className={`nav-links ${menuOpen ? "open" : ""}`}>
             <a href="#workflow" onClick={() => setMenuOpen(false)}>
               Workflow
             </a>
