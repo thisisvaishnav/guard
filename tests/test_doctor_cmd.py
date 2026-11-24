@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from guard.doctor_cmd import (
+from guard_cli.doctor_cmd import (
     check_environment,
     check_backend,
     check_graph,
@@ -38,7 +38,7 @@ def test_check_backend_healthy():
     mock_backend.is_healthy.return_value = True
     mock_backend.describe.return_value = {"healthy": True, "connection_str": "localhost:6379"}
 
-    with patch("guard.doctor_cmd.resolve_backend", return_value=mock_backend):
+    with patch("guard_cli.doctor_cmd.resolve_backend", return_value=mock_backend):
         res, backend = check_backend(Path.cwd())
         assert res.status == "pass"
         assert "Backend 'server' is healthy" in res.message
@@ -50,7 +50,7 @@ def test_check_backend_unreachable():
     mock_backend.is_healthy.return_value = False
     mock_backend.describe.return_value = {"healthy": False}
 
-    with patch("guard.doctor_cmd.resolve_backend", return_value=mock_backend):
+    with patch("guard_cli.doctor_cmd.resolve_backend", return_value=mock_backend):
         res, backend = check_backend(Path.cwd())
         assert res.status == "fail"
         assert "unreachable" in res.message
@@ -63,7 +63,7 @@ def test_check_graph_populated(tmp_path):
     mock_graph = MagicMock()
     mock_backend.get_graph.return_value = mock_graph
 
-    with patch("guard.doctor_cmd.db.get_schema_counts", return_value={"Function": 12, "File": 3, "COVERED_BY": 15}):
+    with patch("guard_cli.doctor_cmd.db.get_schema_counts", return_value={"Function": 12, "File": 3, "COVERED_BY": 15}):
         res = check_graph(tmp_path, mock_backend)
         assert res.status == "pass"
         assert "12 functions" in res.message
@@ -75,7 +75,7 @@ def test_check_graph_empty(tmp_path):
     mock_graph = MagicMock()
     mock_backend.get_graph.return_value = mock_graph
 
-    with patch("guard.doctor_cmd.db.get_schema_counts", return_value={}):
+    with patch("guard_cli.doctor_cmd.db.get_schema_counts", return_value={}):
         res = check_graph(tmp_path, mock_backend)
         assert res.status == "fail"
         assert "0 nodes" in res.message

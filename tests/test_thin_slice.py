@@ -1,15 +1,15 @@
 """Unit tests for Thin Slice (Task T5a)."""
 import pytest
 from pathlib import Path
-from guard import db
-from guard.thin_slice import (
+from guard_cli import db
+from guard_cli.thin_slice import (
     parse_unified_diff,
     resolve_changed_functions,
     thin_slice_decision,
     guard_check,
     ChangedFunction,
 )
-from guard.ingest.static import StaticResult, FuncDef
+from guard_cli.ingest.static import StaticResult, FuncDef
 
 
 SAMPLE_DIFF = """diff --git a/src/flask/config.py b/src/flask/config.py

@@ -1,8 +1,8 @@
 """Unit tests for coverage ingestion module (Task T4)."""
 import pytest
 from pathlib import Path
-from guard import db
-from guard.ingest.coverage import (
+from guard_cli import db
+from guard_cli.ingest.coverage import (
     normalize_test_id,
     compute_flakiness,
     read_coverage_contexts,
@@ -10,7 +10,7 @@ from guard.ingest.coverage import (
     CoverageResult,
     _write_to_falkordb,
 )
-from guard.ingest.static import StaticResult, FuncDef
+from guard_cli.ingest.static import StaticResult, FuncDef
 
 
 def test_normalize_test_id():

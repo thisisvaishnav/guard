@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
-from guard.backend import (
+from guard_cli.backend import (
     GraphBackend,
     ServerBackend,
     DockerBackend,

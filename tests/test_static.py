@@ -1,4 +1,4 @@
-from guard.ingest.static import analyze_repo
+from guard_cli.ingest.static import analyze_repo
 
 
 def make(tmp_path, files):

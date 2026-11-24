@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from guard.init_cmd import (
+from guard_cli.init_cmd import (
     find_repo_root,
     find_test_environment,
     check_pytest_cov,
@@ -16,7 +16,7 @@ from guard.init_cmd import (
     INTEGRATION_MARKER_START,
     INTEGRATION_MARKER_END,
 )
-from guard.backend import ServerBackend
+from guard_cli.backend import ServerBackend
 
 
 def test_find_repo_root_valid(tmp_path):

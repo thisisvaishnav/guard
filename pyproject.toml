@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "guard-cli"
 version = "0.1.5"
-description = "Graph-powered safety layer for AI coding agents built on FalkorDB"
+description = "Zero-daemon predictive test engine and graph safety layer for AI coding agents"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -40,8 +40,9 @@ guard-cli = "guard_cli.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["guard_cli*"]
-exclude = ["guard", "guard.*"]
+exclude = ["tests*", "landing*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

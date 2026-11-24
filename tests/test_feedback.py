@@ -1,8 +1,8 @@
 """Unit tests for feedback loop and repair edge mechanism (Task T6)."""
 import pytest
-from guard import db
-from guard.feedback import record_miss
-from guard.ingest.static import StaticResult, FuncDef
+from guard_cli import db
+from guard_cli.feedback import record_miss
+from guard_cli.ingest.static import StaticResult, FuncDef
 
 
 @pytest.fixture

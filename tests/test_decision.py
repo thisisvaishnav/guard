@@ -3,7 +3,7 @@
 One test per hard override and per policy level, plus the queryable-reason and
 frozen-parameter guarantees required by the T5 acceptance section of PLAN.md.
 """
-from guard.decision import (
+from guard_cli.decision import (
     TRUST_MEDIUM_MIN,
     TRUST_SUBSET_MIN,
     W_CERTAINTY,

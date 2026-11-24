@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from guard.init_cmd import run_init, INTEGRATION_MARKER_START
-from guard.doctor_cmd import run_doctor
+from guard_cli.init_cmd import run_init, INTEGRATION_MARKER_START
+from guard_cli.doctor_cmd import run_doctor
 from guard_cli.backend import ServerBackend
 
 

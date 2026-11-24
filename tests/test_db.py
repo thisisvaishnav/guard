@@ -1,6 +1,6 @@
 import pytest
-from guard import db
-from guard.ingest.static import StaticResult, FuncDef
+from guard_cli import db
+from guard_cli.ingest.static import StaticResult, FuncDef
 
 
 @pytest.fixture
