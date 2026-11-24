@@ -561,7 +561,7 @@ export default function App() {
                 baseline and same-file heuristics.
               </blockquote>
               <footer>
-                <img src="/assets/louis.png" alt="" />
+                <span className="avatar-letter">ER</span>
                 <span>
                   <b>Evaluation Report</b>
                   <small>Held-out Test Split · pallets/flask</small>

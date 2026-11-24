@@ -21,32 +21,12 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
    Written straight to the DOM every frame, never through state:
    a pointer move is not a render. */
 
-/* ── inlined from lab/spring ──────────────────────── */
-/* ── one spring, for everything that settles ───────────────
-   The maths was already on this bench twice, copied by hand:
-   Humidity's wheel and Brightness's column both accumulate
-   velocity toward a target, damp it, and snap when both the
-   delta and the velocity fall under 0.02. Two copies is a
-   coincidence; five would be a policy, so it comes out here
-   before the elastic blocks are written against it.
-
-   The two shipped copies are deliberately NOT refactored onto
-   this. They work, they are tuned, and rewriting the innards
-   of two live components to prove a point about duplication
-   is how a good afternoon becomes a bad one. This is the one
-   new code uses.
-
-   Frames, not milliseconds. `dt` is expressed in sixtieths of
-   a second and the damping is RAISED to it rather than
-   multiplied by it, so a dropped frame decays the same amount
-   of energy as the two frames it replaced. Multiplying is the
-   version that makes a spring behave differently on a busy
-   page, which is the hardest kind of bug to see.
-
-   The loop parks itself the moment the value has settled.
-   CLAUDE.md is not complimentary about the one permanent
-   requestAnimationFrame already on this bench and there is no
-   case for five more. */
+/* ── Spring simulation ────────────────────────────────────
+   Accumulates velocity toward a pointer target, damps it,
+   and snaps when delta and velocity fall below 0.02.
+   Damping is raised to dt (expressed in 60Hz ticks) to
+   preserve smooth behavior across frame drops.
+   The animation loop unregisters as soon as the spring settles. */
 
 /* Read once, the way the wheel and the pill nav do. A
    preference, not a live input. */

@@ -6,10 +6,10 @@
     "prereqUrl": "https://docs.astral.sh/uv/",
     "installCmd": "uv tool install guard-cli",
     "initCmd": "guard init --yes",
-    "initNote": "Run this command in your project root directory. Guard builds the FalkorDB test graph for your repository.",
+    "initNote": "Run this command in your project root directory. Guard builds the SQLite test graph for your repository.",
     "restart": "Restart Claude Code in your project directory.",
     "verify": "guard doctor",
-    "expected": "──────────────────────── Guard Doctor Diagnostic Report ────────────────────────\nSubsystem Checks:\n  environment   PASS   Python 3.10+, guard v0.1.2 (binary: guard)\n  backend       PASS   Backend 'server' is healthy (localhost:6379)\n  graph         PASS   Graph has 393 functions, 1,038 tests, 22,015 coverage edges\n  freshness     PASS   Graph is fresh at commit 822d265\n  target_repo   PASS   Target environment verified with pytest and pytest-cov\n  integrations  PASS   Integrations verified for claude (AGENTS.md and .gitignore present)\n  hook_timeout  PASS   Hook timeout is configured to 180s.\nResult: 7 passed, 0 warnings, 0 failures",
+    "expected": "──────────────────────── Guard Doctor Diagnostic Report ────────────────────────\nSubsystem Checks:\n  environment   PASS   Python 3.10+, guard v0.1.5 (binary: guard)\n  backend       PASS   Backend 'sqlite' is healthy (.guard/graph.db)\n  graph         PASS   Graph has 393 functions, 1,038 tests, 22,015 coverage edges\n  freshness     PASS   Graph is fresh at commit 822d265\n  target_repo   PASS   Target environment verified with pytest and pytest-cov\n  integrations  PASS   Integrations verified for claude (AGENTS.md and .gitignore present)\n  hook_timeout  PASS   Hook timeout is configured to 180s.\nResult: 7 passed, 0 warnings, 0 failures",
     "writes": [
       {
         "file": ".claude/settings.local.json",
@@ -30,7 +30,7 @@
     ],
     "coverageNote": "The --yes option installs pytest-cov if pytest-cov is not installed in your environment.",
     "undo": "guard hook uninstall",
-    "platformLimit": "System requirements: Embedded FalkorDB requires Python 3.12+, Linux glibc 2.39+, or macOS 15+. On other systems, Guard uses Docker automatically.",
+    "platformLimit": "System requirements: Zero-daemon embedded SQLite requires zero background processes (0 MB RAM). Optional FalkorDB server backend supported.",
     "alternative": "Optional: Install Guard with pipx (pipx install guard-cli)."
   },
   {
@@ -43,7 +43,7 @@
     "initNote": "Run this command in your project root directory to index code and configure hooks.",
     "restart": "Close Antigravity and open your workspace again.",
     "verify": "guard doctor",
-    "expected": "──────────────────────── Guard Doctor Diagnostic Report ────────────────────────\nSubsystem Checks:\n  environment   PASS   Python 3.10+, guard v0.1.2 (binary: guard)\n  backend       PASS   Backend 'server' is healthy (localhost:6379)\n  graph         PASS   Graph has 393 functions, 1,038 tests, 22,015 coverage edges\n  freshness     PASS   Graph is fresh at commit 822d265\n  target_repo   PASS   Target environment verified with pytest and pytest-cov\n  integrations  PASS   Integrations verified for antigravity (AGENTS.md and .gitignore present)\n  hook_timeout  PASS   Hook timeout is configured to 180s.\nResult: 7 passed, 0 warnings, 0 failures",
+    "expected": "──────────────────────── Guard Doctor Diagnostic Report ────────────────────────\nSubsystem Checks:\n  environment   PASS   Python 3.10+, guard v0.1.5 (binary: guard)\n  backend       PASS   Backend 'sqlite' is healthy (.guard/graph.db)\n  graph         PASS   Graph has 393 functions, 1,038 tests, 22,015 coverage edges\n  freshness     PASS   Graph is fresh at commit 822d265\n  target_repo   PASS   Target environment verified with pytest and pytest-cov\n  integrations  PASS   Integrations verified for antigravity (AGENTS.md and .gitignore present)\n  hook_timeout  PASS   Hook timeout is configured to 180s.\nResult: 7 passed, 0 warnings, 0 failures",
     "writes": [
       {
         "file": ".agents/hooks.json",
@@ -64,7 +64,7 @@
     ],
     "coverageNote": "The --yes option installs pytest-cov if pytest-cov is not installed in your environment.",
     "undo": "guard hook uninstall --antigravity",
-    "platformLimit": "System requirements: Embedded FalkorDB requires Python 3.12+, Linux glibc 2.39+, or macOS 15+. On other systems, Guard uses Docker automatically.",
+    "platformLimit": "System requirements: Zero-daemon embedded SQLite requires zero background processes (0 MB RAM). Optional FalkorDB server backend supported.",
     "alternative": "Optional: Install Guard with pipx (pipx install guard-cli)."
   }
 ]

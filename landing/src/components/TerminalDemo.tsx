@@ -32,7 +32,7 @@ const FRAMES: Frame[] = [
       { type: "prompt", text: "claude" },
       { type: "agent", text: "✓ Modified 2 functions in src/flask/helpers.py" },
       { type: "guard", text: "⚡ Guard stop hook intercepted completion (session: sess_8a2f)" },
-      { type: "guard", text: "  Traversing FalkorDB graph: 26 covering tests found across 4 suites" },
+      { type: "guard", text: "  Traversing SQLite test graph: 26 covering tests found across 4 suites" },
       { type: "guard", text: "  Skipped 405 unrelated tests with queryable reasons" },
       { type: "dim", text: "  pytest -q tests/test_helpers.py tests/test_basic.py tests/test_blueprints.py" },
       { type: "test-pass", text: "  ✓ tests/test_helpers.py::test_url_for PASSED" },

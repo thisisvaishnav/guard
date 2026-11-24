@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 36" fill="none">
-  <rect x="1" y="3" width="30" height="30" rx="8" fill="#141414"/>
-  <path d="M7 11L11.5 24L16 14L20.5 24L25 11" stroke="#ff5c51" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="40" y="25.5" fill="#141414" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22" font-weight="800" letter-spacing="-0.8">warrant</text>
-  <circle cx="128" cy="23.5" r="3" fill="#ff5c51"/>
-</svg>
