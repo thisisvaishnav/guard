@@ -47,7 +47,7 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
 
 
 # 1. Baseline: commit broken change, new conversationId, hook must block
-def test_item1_baseline_new_conversation_blocks_on_committed_change(tmp_path):
+def test_baseline_new_conversation_blocks_on_committed_change(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init")
@@ -98,7 +98,7 @@ def test_item1_baseline_new_conversation_blocks_on_committed_change(tmp_path):
 
 
 # 2. Stdout purity: stdout must contain exactly one JSON object and nothing else
-def test_item2_stdout_purity_pipe_json_tool(tmp_path, capsys):
+def test_stdout_purity_pipe_json_tool(tmp_path, capsys):
     repo = tmp_path / "repo"
     repo.mkdir()
 
@@ -156,7 +156,7 @@ def test_item2_stdout_purity_pipe_json_tool(tmp_path, capsys):
 
 
 # 3. Payload capture: if GUARD_DEBUG_PAYLOAD=1, write raw stdin payload to .guard/last_payload.json
-def test_item3_payload_capture_with_fixture(tmp_path, monkeypatch):
+def test_payload_capture_with_fixture(tmp_path, monkeypatch):
     assert FIXTURE_PATH.exists()
     fixture_content = FIXTURE_PATH.read_text(encoding="utf-8")
     fixture_data = json.loads(fixture_content)
@@ -188,7 +188,7 @@ def test_item3_payload_capture_with_fixture(tmp_path, monkeypatch):
 
 
 # 4. Block message: lists failing tests and changed function, and says "Fix the source code. Do not edit, skip, or delete tests."
-def test_item4_block_message_content():
+def test_block_message_content():
     report = {
         "policy": "subset",
         "trust": 0.88,
@@ -206,7 +206,7 @@ def test_item4_block_message_content():
 
 
 # 5. Database down: allow stop with {"decision":"stop","reason":"Guard skipped: database unreachable"} and log fail_open
-def test_item5_database_down_allows_stop_and_logs_fail_open(tmp_path, capsys):
+def test_database_down_allows_stop_and_logs_fail_open(tmp_path, capsys):
     repo = tmp_path / "repo"
     repo.mkdir()
 
@@ -242,7 +242,7 @@ def test_item5_database_down_allows_stop_and_logs_fail_open(tmp_path, capsys):
 
 
 # 6. Block cap: agent gets 3 blocks, then a handback (fixed off-by-one)
-def test_item6_block_cap_gives_three_blocks_then_handback(tmp_path):
+def test_block_cap_gives_three_blocks_then_handback(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     sess_id = "sess-loop-3cap"
@@ -294,7 +294,7 @@ def test_item6_block_cap_gives_three_blocks_then_handback(tmp_path):
 
 
 # 7. Hook command: write absolute path of guard into .agents/hooks.json, guard doctor checks existence
-def test_item7_absolute_path_written_and_checked_by_doctor(tmp_path):
+def test_absolute_path_written_and_checked_by_doctor(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / ".gitignore").write_text(".guard/\n", encoding="utf-8")
@@ -325,7 +325,7 @@ def test_item7_absolute_path_written_and_checked_by_doctor(tmp_path):
 
 
 # 8. Hooks doc verification: field names, timeout unit in seconds, available events
-def test_item8_hooks_spec_conformance():
+def test_antigravity_hooks_spec_conformance():
     custom_doc = os.environ.get("ANTIGRAVITY_HOOKS_DOC")
     doc_path = Path(custom_doc) if custom_doc else None
     if doc_path and doc_path.exists():

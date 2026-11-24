@@ -58,7 +58,7 @@ def test_write_integrations_idempotent(tmp_path):
     agents_md.write_text("# Agent Rules\nAlways follow instructions.\n", encoding="utf-8")
 
     # Run 1
-    modified_1 = write_integrations(tmp_path, ["claude", "cursor"])
+    modified_1 = write_integrations(tmp_path, ["claude", "antigravity"])
     assert len(modified_1) >= 3
 
     # Check gitignore
@@ -82,7 +82,7 @@ def test_write_integrations_idempotent(tmp_path):
     assert INTEGRATION_MARKER_START in claude_md.read_text(encoding="utf-8")
 
     # Run 2 (Idempotency check: must not duplicate markers or entries)
-    write_integrations(tmp_path, ["claude", "cursor"])
+    write_integrations(tmp_path, ["claude", "antigravity"])
 
     gi_content_2 = gitignore.read_text(encoding="utf-8")
     assert gi_content_2.count(".guard/") == 1

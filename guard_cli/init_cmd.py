@@ -428,7 +428,7 @@ def run_init(
     backend_preference: str | None = None,
     skip_coverage: bool = False,
     auto_yes: bool = False,
-    agents: str = "claude,cursor,codex,antigravity",
+    agents: str = "claude,antigravity",
     runs: int | None = None,
 ) -> int:
     """Execute complete guard init workflow."""

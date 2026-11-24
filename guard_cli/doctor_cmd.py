@@ -411,7 +411,7 @@ def apply_fixes(repo_path: Path, backend: GraphBackend | None, checks: list[Chec
                 applied.append(f"Started docker container '{backend.container_name}'.")
 
         elif c.name == "integrations":
-            write_integrations(repo_path, agents=["claude", "cursor", "codex", "antigravity"])
+            write_integrations(repo_path, agents=["claude", "antigravity"])
             applied.append("Wrote integrations to .gitignore, .agents/hooks.json, .claude/settings.json, AGENTS.md, and CLAUDE.md.")
 
     return applied

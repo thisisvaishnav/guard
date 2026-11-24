@@ -10,7 +10,7 @@
 [![Storage](https://img.shields.io/badge/storage-embedded%20SQLite-003B57.svg?style=flat&logo=sqlite&logoColor=white)](https://sqlite.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Status](https://img.shields.io/badge/daemon-zero%20background%20processes-success.svg)](#architecture)
-[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Antigravity%20%7C%20Cursor-purple.svg)](#agent-integration)
+[![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Antigravity-purple.svg)](#agent-integration)
 
 [Quickstart](#quickstart) • [How It Works](#how-it-works) • [Architecture](#architecture) • [Trust Engine](#trust--decision-engine) • [Benchmarks](#empirical-benchmarks) • [CLI Reference](#cli-reference)
 
@@ -20,7 +20,7 @@
 
 ## ⚡ The Problem
 
-AI coding agents (like Claude Code, Antigravity, and Cursor) write and refactor code at superhuman speed. However:
+AI coding agents (like Claude Code and Antigravity) write and refactor code at superhuman speed. However:
 1. **Running the full test suite on every turn kills momentum** — large suites take minutes, breaking agent flow and burning tokens.
 2. **Skipping tests is catastrophic** — agents hallucinate that subtle regressions are fine and commit broken code.
 3. **Naive file-based diffing is blind** — changing a helper function in `utils.py` can break an endpoint in `api.py` that no file-level heuristic catches.
@@ -198,7 +198,7 @@ Guard registers a Stop hook in `.claude/settings.local.json` (or `.claude/settin
 ```
 
 ### Antigravity
-Guard registers a `PreStop` hook in `.agents/hooks.json`:
+Guard registers a `Stop` hook in `.agents/hooks.json`:
 ```json
 {
   "hooks": {
@@ -211,7 +211,7 @@ Guard registers a `PreStop` hook in `.agents/hooks.json`:
 }
 ```
 
-### Cursor, Codex, and Custom LLM Harnesses
+### Custom LLM Harnesses & Pre-Commit Hooks
 Guard hooks into standard shell execution or pre-commit hooks:
 ```bash
 guard hook stop --repo /path/to/repo

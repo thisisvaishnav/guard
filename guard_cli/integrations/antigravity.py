@@ -4,15 +4,11 @@ Installs, uninstalls, and checks status of Guard's Stop hook in .agents/hooks.js
 - Merges into existing `hooks.json` config.
 - Preserves all other configured hooks and handlers.
 
-Format verified against official Antigravity docs (antigravity.google/docs/hooks):
-the top level maps hook names to event configs; for Stop (like PreInvocation and
+The top level maps hook names to event configs; for Stop (like PreInvocation and
 PostInvocation) handler objects sit directly under the event key (matcher is
 ignored), each supporting {type: "command", command, timeout}. Stop hooks
 re-enter the loop by emitting {"decision": "continue", "reason": ...} on stdout
 (exit 0); any other decision (or silent exit 0) allows the stop.
-
-EXPERIMENTAL: verified against the published schema and simulated stdin/stdout
-only; a live Antigravity session has not yet confirmed end-to-end behavior.
 """
 from __future__ import annotations
 import json

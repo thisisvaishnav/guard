@@ -219,7 +219,7 @@ def cmd_init(args) -> int:
         backend_preference=getattr(args, "backend", None),
         skip_coverage=getattr(args, "skip_coverage", False),
         auto_yes=getattr(args, "yes", False),
-        agents=getattr(args, "agents", "claude,cursor,codex,antigravity"),
+        agents=getattr(args, "agents", "claude,antigravity"),
         runs=getattr(args, "runs", None),
     )
 
@@ -247,7 +247,7 @@ def main(argv=None) -> int:
     ini.add_argument("--backend", choices=["sqlite", "server", "docker", "embedded"], default=None, help="database backend")
     ini.add_argument("--skip-coverage", action="store_true", help="skip per-test coverage ingestion")
     ini.add_argument("-y", "--yes", action="store_true", help="non-interactive mode accepting all defaults")
-    ini.add_argument("--agents", default="claude,cursor,codex,antigravity", help="comma-separated agents to configure")
+    ini.add_argument("--agents", default="claude,antigravity", help="comma-separated agents to configure")
     ini.add_argument("--runs", type=int, default=None, help="number of baseline test runs (1 or 3)")
     ini.set_defaults(fn=cmd_init)
 

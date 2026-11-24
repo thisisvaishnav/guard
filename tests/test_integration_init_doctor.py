@@ -92,7 +92,7 @@ def test_init_then_doctor_e2e(throwaway_repo, capsys):
         backend_preference=backend_choice,
         skip_coverage=True,
         auto_yes=True,
-        agents="claude,cursor",
+        agents="claude,antigravity",
     )
     assert init_code == 0
 
