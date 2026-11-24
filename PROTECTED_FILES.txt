@@ -1,4 +1,0 @@
-the CLAIM and DEFINITIONS section of PLAN.md
-the mutant split file (when it exists: evals/split.json)
-tests/test_static.py
-tests/verify_t1.py

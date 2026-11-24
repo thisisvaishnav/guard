@@ -1,5 +1,0 @@
-{"timestamp": "2026-10-17T15:55:16.729369+00:00", "event": "hook_fired", "session_id": "c3205fea-2aed-424a-b8f1-0b8cb5124221", "details": {"stop_hook_active": false, "agent_type": "antigravity"}}
-{"timestamp": "2026-10-17T15:55:19.782153+00:00", "event": "blocked", "session_id": "c3205fea-2aed-424a-b8f1-0b8cb5124221", "details": {"exit_code": 1, "tests_passed": false, "tests_run_count": 1, "failures": ["tests/test_helpers.py::TestStreaming::test_async_view"], "policy": "run_all"}}
-{"timestamp": "2026-10-17T15:55:19.783844+00:00", "event": "blocked", "session_id": "c3205fea-2aed-424a-b8f1-0b8cb5124221", "details": {"consecutive_blocks": 1, "policy": "run_all", "failures": ["tests/test_helpers.py::TestStreaming::test_async_view"]}}
-{"timestamp": "2026-10-17T15:55:30.313914+00:00", "event": "hook_fired", "session_id": "c3205fea-2aed-424a-b8f1-0b8cb5124221", "details": {"stop_hook_active": false, "agent_type": "antigravity"}}
-{"timestamp": "2026-10-17T15:55:30.423175+00:00", "event": "idle_turn", "session_id": "c3205fea-2aed-424a-b8f1-0b8cb5124221", "details": {"reason": "non_python_changes_only", "fingerprint": null}}
